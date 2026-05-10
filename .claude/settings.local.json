@@ -5,7 +5,10 @@
       "Bash(npm run *)",
       "WebFetch(domain:www.prisma.io)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://perfumapidatabase.onrender.com/perfumes?limit=5\")",
-      "Bash(curl -s \"https://perfumapidatabase.onrender.com/perfumes?limit=5\")"
+      "Bash(curl -s \"https://perfumapidatabase.onrender.com/perfumes?limit=5\")",
+      "Bash(npx tsx --env-file=.env -e ' *)",
+      "Bash(npx tsx *)",
+      "Bash(npx shadcn *)"
     ]
   }
 }
