@@ -51,6 +51,8 @@ model Producto {
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
   ordenItems    ProductoOrden[]
+
+  @@unique([nombre, marca])
 }
 
 model VarianteProducto {

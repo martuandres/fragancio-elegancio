@@ -6,6 +6,5 @@ export default async function Home() {
   // if (!userId) redirect("/sign-in");
   // const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
   
-  // Por ahora redirigir a dashboard directamente
-  redirect("/dashboard");
+  redirect("/catalogo");
 }
