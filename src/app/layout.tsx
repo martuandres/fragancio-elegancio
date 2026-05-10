@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Instrument_Sans, IBM_Plex_Sans, JetBrains_Mono, Geist } from "next/font/google";
-import { ClerkProvider } from "@clerk/nextjs";
+// import { ClerkProvider } from "@clerk/nextjs"; // TEMP: desactivado hasta configurar keys
 import { QueryProvider } from "@/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -30,20 +30,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html
-        lang="es"
-        className={cn("h-full", "antialiased", instrumentSans.variable, jetbrainsMono.variable, "font-sans", geist.variable)}
-      >
-        <body className="min-h-full flex flex-col">
-          <QueryProvider>
-            <TooltipProvider>
-              {children}
-              <Toaster />
-            </TooltipProvider>
-          </QueryProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    // TEMP: <ClerkProvider> desactivado hasta configurar keys
+    <html
+      lang="es"
+      className={cn("h-full", "antialiased", instrumentSans.variable, jetbrainsMono.variable, "font-sans", geist.variable)}
+    >
+      <body className="min-h-full flex flex-col">
+        <QueryProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
+        </QueryProvider>
+      </body>
+    </html>
   );
 }

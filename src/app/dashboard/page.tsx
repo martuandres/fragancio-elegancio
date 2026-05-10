@@ -1,5 +1,6 @@
-import { currentUser } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
+// TEMP: Clerk desactivado
+// import { currentUser } from "@clerk/nextjs/server";
+// import { redirect } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -20,8 +21,15 @@ import {
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const user = await currentUser();
-  if (!user) redirect("/sign-in");
+  // const user = await currentUser();
+  // if (!user) redirect("/sign-in");
+  
+  // TEMP: Usuario mock para desarrollo sin Clerk
+  const user = {
+    firstName: "Usuario",
+    emailAddresses: [{ emailAddress: "usuario@test.com" }],
+    imageUrl: null,
+  };
 
   const firstName = user.firstName ?? user.emailAddresses[0]?.emailAddress ?? "Usuario";
 

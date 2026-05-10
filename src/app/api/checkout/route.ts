@@ -1,28 +1,45 @@
-import { auth, clerkClient } from "@clerk/nextjs/server";
+// TEMP: Clerk desactivado
+// import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { checkoutAtomico } from "@/lib/stock";
 import { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-  const { userId, sessionClaims } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
+  // TEMP: Sin Clerk, usar usuario de prueba
+  // const { userId, sessionClaims } = await auth();
+  // if (!userId) return new Response("Unauthorized", { status: 401 });
+  // const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
+  // if (role !== "comprador") return new Response("Solo compradores pueden hacer checkout", { status: 403 });
+  // const clerk = await clerkClient();
+  // const clerkUser = await clerk.users.getUser(userId);
+  // const email = clerkUser.emailAddresses[0]?.emailAddress;
+  // if (!email) return new Response("No email", { status: 400 });
 
-  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
-  if (role !== "comprador") return new Response("Solo compradores pueden hacer checkout", { status: 403 });
-
-  const clerk = await clerkClient();
-  const clerkUser = await clerk.users.getUser(userId);
-  const email = clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) return new Response("No email", { status: 400 });
-
-  const usuario = await prisma.usuario.findUnique({
-    where: { email },
+  let usuario = await prisma.usuario.findFirst({
     select: {
       id_usuario: true,
       comprador: { select: { direccion_envio: true } },
     },
   });
-  if (!usuario) return new Response("Usuario no encontrado", { status: 404 });
+  // if (!usuario) return new Response("Usuario no encontrado", { status: 404 });
+  if (!usuario) {
+    // Crear usuario de prueba si no existe
+    const newUsuario = await prisma.usuario.create({
+      data: {
+        email: "test@example.com",
+        nombre: "Usuario Test",
+        contrasena: "",
+        comprador: { create: { direccion_envio: "Calle Test 123" } },
+      },
+      select: {
+        id_usuario: true,
+        comprador: { select: { direccion_envio: true } },
+      },
+    });
+    usuario = newUsuario;
+  }
+
+  if (!usuario) return new Response("Error creando usuario", { status: 500 });
 
   const body = (await req.json()) as { direccion_envio?: string };
   const direccion_envio = body.direccion_envio?.trim() || usuario.comprador?.direccion_envio;
