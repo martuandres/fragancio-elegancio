@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, X } from "lucide-react";
+import Image from "next/image";
+import { Droplets, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,7 @@ export type ProductoBase = {
   precio: number;
   stock: number;
   concentracion: string | null;
+  imagen_url: string | null;
   notas_salida: string | null;
   notas_corazon: string | null;
   notas_fondo: string | null;
@@ -282,7 +284,22 @@ function ProductoCard({
   coincidencias?: number;
 }) {
   return (
-    <Card className="flex h-full flex-col hover:shadow-md transition-shadow">
+    <Card className="card-perfume flex h-full flex-col overflow-hidden hover:shadow-xl">
+      {p.imagen_url ? (
+        <div className="relative h-48 w-full shrink-0">
+          <Image
+            src={p.imagen_url}
+            alt={`${p.marca} ${p.nombre}`}
+            fill
+            className="object-cover"
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+          />
+        </div>
+      ) : (
+        <div className="flex h-48 w-full shrink-0 items-center justify-center bg-muted">
+          <Droplets className="size-10 text-muted-foreground/40" />
+        </div>
+      )}
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

@@ -25,6 +25,7 @@ const SELECT = {
   precio: true,
   stock: true,
   concentracion: true,
+  imagen_url: true,
   notas_salida: true,
   notas_corazon: true,
   notas_fondo: true,
@@ -94,10 +95,10 @@ export default async function CatalogoPage({
   const notasSalida  = extractNotes(allProductos, "notas_salida");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen w-full flex-col bg-background">
       {/* Navbar */}
-      <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
-        <div className="container mx-auto flex h-14 items-center justify-between px-4">
+      <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex h-14 w-full max-w-screen-xl items-center justify-between px-4">
           <div className="flex items-center gap-2.5">
             <Droplets className="size-6 text-primary" />
             <div className="leading-tight">
@@ -116,33 +117,35 @@ export default async function CatalogoPage({
         </div>
       </header>
 
-      <main className="pt-14">
+      <main className="flex flex-1 flex-col pt-14">
         {/* Hero */}
-        <section className="bg-gradient-to-b from-muted/60 to-background px-4 py-14 text-center">
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            El perfume que buscás está acá
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Explorá miles de fragancias por sus notas olfativas
-          </p>
+        <section className="w-full bg-gradient-to-b from-muted/60 to-background py-14 text-center">
+          <div className="mx-auto w-full max-w-screen-xl px-4">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              El perfume que buscás está acá
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Explorá miles de fragancias por sus notas olfativas
+            </p>
 
-          <form method="GET" className="mx-auto mt-6 flex max-w-xl gap-2">
-            {categoria     && <input type="hidden" name="categoria"     value={categoria} />}
-            {genero        && <input type="hidden" name="genero"        value={genero} />}
-            {concentracion && <input type="hidden" name="concentracion" value={concentracion} />}
-            <input
-              name="q"
-              defaultValue={q}
-              placeholder="Buscar por nombre o marca…"
-              className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-            <Button type="submit" variant="outline">Buscar</Button>
-          </form>
+            <form method="GET" className="mx-auto mt-6 flex max-w-xl gap-2">
+              {categoria     && <input type="hidden" name="categoria"     value={categoria} />}
+              {genero        && <input type="hidden" name="genero"        value={genero} />}
+              {concentracion && <input type="hidden" name="concentracion" value={concentracion} />}
+              <input
+                name="q"
+                defaultValue={q}
+                placeholder="Buscar por nombre o marca…"
+                className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <Button type="submit" variant="outline">Buscar</Button>
+            </form>
+          </div>
         </section>
 
         {/* Pills de categorías */}
-        <section className="border-b border-border bg-background px-4 py-4">
-          <div className="container mx-auto">
+        <section className="w-full border-b border-border bg-background py-4">
+          <div className="mx-auto w-full max-w-screen-xl px-4">
             <Suspense fallback={<div className="h-8 w-64 animate-pulse rounded-full bg-muted" />}>
               <CategoryPills />
             </Suspense>
@@ -150,15 +153,17 @@ export default async function CatalogoPage({
         </section>
 
         {/* Sección de productos + drawer Armar tu perfume */}
-        <section className="container mx-auto px-4 py-8">
-          <ArmarPerfumeSection
-            allProductos={allProductos}
-            initialProductos={productos}
-            total={total}
-            notasFondo={notasFondo}
-            notasCorazon={notasCorazon}
-            notasSalida={notasSalida}
-          />
+        <section className="w-full flex-1 py-8">
+          <div className="mx-auto w-full max-w-screen-xl px-4">
+            <ArmarPerfumeSection
+              allProductos={allProductos}
+              initialProductos={productos}
+              total={total}
+              notasFondo={notasFondo}
+              notasCorazon={notasCorazon}
+              notasSalida={notasSalida}
+            />
+          </div>
         </section>
       </main>
     </div>

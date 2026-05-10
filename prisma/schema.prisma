@@ -43,6 +43,7 @@ model Producto {
   stock         Int                 @default(0)
   concentracion String?
   ingredientes  String?
+  imagen_url    String?
   notas_salida  String?
   notas_corazon String?
   notas_fondo   String?
@@ -51,6 +52,7 @@ model Producto {
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
   ordenItems    ProductoOrden[]
+  
 
   @@unique([nombre, marca])
 }
@@ -162,3 +164,5 @@ model Envio {
   direccion_envio String
   orden           OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
 }
+
+

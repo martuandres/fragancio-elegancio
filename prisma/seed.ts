@@ -13,6 +13,8 @@ type PerfumAPIItem = {
   notes_base?: string[];
   description?: string;
   gender?: string;
+  image_url?: string;
+  rating?: number | string;
 };
 
 async function main() {
@@ -41,6 +43,7 @@ async function main() {
       stock:         10,
       concentracion: p.gender?.trim() || null,
       ingredientes:  p.description?.trim() || null,
+      imagen_url:    p.image_url?.trim() || null,
       notas_salida:  p.notes_top?.join(", ")    || null,
       notas_corazon: p.notes_middle?.join(", ") || null,
       notas_fondo:   p.notes_base?.join(", ")   || null,

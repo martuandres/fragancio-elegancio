@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Instrument_Sans, IBM_Plex_Sans, JetBrains_Mono, Geist } from "next/font/google";
+import { Instrument_Sans, JetBrains_Mono, Geist } from "next/font/google";
 // import { ClerkProvider } from "@clerk/nextjs"; // TEMP: desactivado hasta configurar keys
 import { QueryProvider } from "@/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,7 +35,7 @@ export default function RootLayout({
       lang="es"
       className={cn("h-full", "antialiased", instrumentSans.variable, jetbrainsMono.variable, "font-sans", geist.variable)}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
         <QueryProvider>
           <TooltipProvider>
             {children}
