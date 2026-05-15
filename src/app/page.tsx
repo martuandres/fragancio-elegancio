@@ -1,10 +1,9 @@
-// TEMP: Clerk desactivado temporalmente
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 export default async function Home() {
-  // const { userId, sessionClaims } = await auth();
-  // if (!userId) redirect("/sign-in");
-  // const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
-  
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
+
   redirect("/catalogo");
 }

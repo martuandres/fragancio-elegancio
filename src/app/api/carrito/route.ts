@@ -1,32 +1,8 @@
-// TEMP: Clerk desactivado
-// import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
 async function resolveComprador() {
-  // TEMP: Sin Clerk, retornar un usuario mock
-  // En producción, validar con Clerk aquí
-  let mockUser = await prisma.usuario.findFirst({
-    select: { id_usuario: true },
-  });
-  
-  if (!mockUser) {
-    // Crear un usuario de prueba si no existe
-    const newUser = await prisma.usuario.create({
-      data: {
-        email: "test@example.com",
-        nombre: "Usuario Test",
-        contrasena: "",
-        comprador: { create: {} },
-      },
-      select: { id_usuario: true },
-    });
-    mockUser = newUser;
-  }
-  
-  return mockUser;
-
-  /* ORIGINAL (requiere Clerk):
   const { userId, sessionClaims } = await auth();
   if (!userId) return null;
 
@@ -42,7 +18,6 @@ async function resolveComprador() {
     where: { email },
     select: { id_usuario: true },
   });
-  */
 }
 
 async function getOrCreateCarritoActivo(id_usuario: number) {
