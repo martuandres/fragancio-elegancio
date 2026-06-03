@@ -69,11 +69,11 @@ prevalece este documento.
 ### Carrito
 | Atributo      | Descripción                                        |
 |---------------|----------------------------------------------------|
-| `id_pedido`   | PK — identificador del carrito/pedido              |
+| `id_carrito`  | PK — identificador del carrito/pedido              |
 | `estado`      | Estado del carrito                                 |
 | `fecha_creada`| Fecha y hora de creación                           |
 
-> **Nota:** en el diagrama el atributo de PK del Carrito se llama `id_pedido`.
+> **Nota:** en el diagrama el atributo de PK del Carrito se llama `id_carrito`.
 
 ### Pago
 | Atributo  | Descripción                                |
@@ -84,7 +84,7 @@ prevalece este documento.
 ### Factura
 | Atributo       | Descripción                              |
 |----------------|------------------------------------------|
-| `id_pedido`    | FK al Carrito/pedido que la origina      |
+| `id_pago`      | FK al Pago que la origina                |
 | `nro_factura`  | Número único de factura                  |
 | `fecha_emision`| Fecha de emisión                         |
 | `importe_total`| Monto total facturado                    |
@@ -149,7 +149,6 @@ Estas son las discrepancias detectadas entre el diagrama ER oficial y el README:
 | `Proveedor` | Entidad separada de `Vendedor`, con marca/telefono/email_contacto | Tratado como sinónimo de `Vendedor` |
 | `concentracion` | Atributo de `Variante_Producto` | En `Producto` |
 | `legajo` en Comprador | Sí existe | No aparece en README |
-| `OrdenCompra` | No aparece como entidad explícita; `Carrito` tiene `id_pedido` y se relaciona directo con `Pago` y `Envio` | `OrdenCompra` es una entidad separada |
-| PK de `Carrito` | `id_pedido` | `id_carrito` |
+| `OrdenCompra` | No aparece como entidad explícita; `Carrito` tiene `id_carrito` y se relaciona directo con `Pago` y `Envio` | `OrdenCompra` es una entidad separada |
 
 Al implementar el schema Prisma, alinear con este documento.
