@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { NextRequest } from "next/server";
 
+// GET /api/catalogo — listado paginado de productos con stock > 0
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const q = searchParams.get("q")?.trim() || undefined;
@@ -42,6 +43,7 @@ export async function GET(req: NextRequest) {
         precio: true,
         stock: true,
         concentracion: true,
+        imagen_url: true,
         notas_salida: true,
         notas_corazon: true,
         notas_fondo: true,
@@ -62,5 +64,13 @@ export async function GET(req: NextRequest) {
     prisma.producto.count({ where }),
   ]);
 
-  return Response.json({ productos, total, page, limit });
+  return Response.json({
+    data: productos,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  });
 }

@@ -1,5 +1,6 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 
 async function resolveComprador() {
@@ -33,10 +34,11 @@ async function getOrCreateCarritoActivo(id_usuario: number) {
   });
 }
 
-// GET /api/carrito — returns the active cart with its items
+// GET /api/carrito — carrito activo del comprador con ítems y total
 export async function GET() {
   const usuario = await resolveComprador();
-  if (!usuario) return new Response("Unauthorized", { status: 401 });
+  if (!usuario)
+    return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden acceder al carrito.", 401);
 
   const carrito = await prisma.carrito.findFirst({
     where: { id_usuario: usuario.id_usuario, estado: "activo" },
@@ -71,27 +73,34 @@ export async function GET() {
   return Response.json({ ...carrito, total });
 }
 
-// POST /api/carrito — add or update an item { id_producto, cantidad }
+// POST /api/carrito — agregar o actualizar un ítem { id_producto, cantidad }
 export async function POST(req: NextRequest) {
   const usuario = await resolveComprador();
-  if (!usuario) return new Response("Unauthorized", { status: 401 });
+  if (!usuario)
+    return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden modificar el carrito.", 401);
 
   const body = (await req.json()) as { id_producto?: unknown; cantidad?: unknown };
   const id_producto = Number(body.id_producto);
   const cantidad = Number(body.cantidad);
 
   if (!Number.isInteger(id_producto) || id_producto <= 0)
-    return new Response("id_producto inválido", { status: 400 });
+    return apiError("ID_INVALIDO", "El campo 'id_producto' debe ser un entero positivo.", 400);
   if (!Number.isInteger(cantidad) || cantidad <= 0)
-    return new Response("cantidad debe ser un entero positivo", { status: 400 });
+    return apiError("CANTIDAD_INVALIDA", "El campo 'cantidad' debe ser un entero positivo.", 400);
 
   const producto = await prisma.producto.findUnique({
     where: { id_producto },
     select: { stock: true },
   });
-  if (!producto) return new Response("Producto no encontrado", { status: 404 });
+  if (!producto)
+    return apiError("PRODUCTO_NO_ENCONTRADO", `No existe un producto con id ${id_producto}.`, 404);
   if (producto.stock < cantidad)
-    return new Response("Stock insuficiente", { status: 409 });
+    return apiError(
+      "STOCK_INSUFICIENTE",
+      "No hay suficiente stock disponible para la cantidad solicitada.",
+      409,
+      `Stock disponible: ${producto.stock}, solicitado: ${cantidad}`
+    );
 
   const { id_carrito } = await getOrCreateCarritoActivo(usuario.id_usuario);
 
@@ -104,26 +113,28 @@ export async function POST(req: NextRequest) {
   return Response.json({ ok: true, id_carrito });
 }
 
-// DELETE /api/carrito — remove an item { id_producto }
+// DELETE /api/carrito — quitar un ítem { id_producto }
 export async function DELETE(req: NextRequest) {
   const usuario = await resolveComprador();
-  if (!usuario) return new Response("Unauthorized", { status: 401 });
+  if (!usuario)
+    return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden modificar el carrito.", 401);
 
   const body = (await req.json()) as { id_producto?: unknown };
   const id_producto = Number(body.id_producto);
 
   if (!Number.isInteger(id_producto) || id_producto <= 0)
-    return new Response("id_producto inválido", { status: 400 });
+    return apiError("ID_INVALIDO", "El campo 'id_producto' debe ser un entero positivo.", 400);
 
   const carrito = await prisma.carrito.findFirst({
     where: { id_usuario: usuario.id_usuario, estado: "activo" },
     select: { id_carrito: true },
   });
-  if (!carrito) return new Response("Carrito no encontrado", { status: 404 });
+  if (!carrito)
+    return apiError("CARRITO_NO_ENCONTRADO", "No existe un carrito activo para este usuario.", 404);
 
   await prisma.carritoProducto.deleteMany({
     where: { id_carrito: carrito.id_carrito, id_producto },
   });
 
-  return Response.json({ ok: true });
+  return new Response(null, { status: 204 });
 }

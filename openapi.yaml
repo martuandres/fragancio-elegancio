@@ -1,0 +1,1618 @@
+openapi: 3.0.3
+
+info:
+  title: Fragancio Elegancio API
+  version: 1.0.0
+  description: |
+    API REST del marketplace de fragancias **Fragancio Elegancio**.
+
+    ## Autenticación
+    Los endpoints protegidos usan JWT via **Clerk** en el header `Authorization: Bearer <token>`.
+    Los roles válidos son:
+    - `comprador` — acceso al carrito, checkout y pedidos propios.
+    - `vendedor` — acceso al inventario, actualización de pedidos y envíos.
+
+    ## Formato de errores
+    Todos los errores devuelven el mismo envelope:
+    ```json
+    {
+      "error": {
+        "code": "SNAKE_UPPER_CASE",
+        "message": "Descripción legible del error.",
+        "details": "Información adicional opcional."
+      }
+    }
+    ```
+
+    ## Paginación
+    Las colecciones paginadas usan la estructura:
+    ```json
+    {
+      "data": [...],
+      "pagination": { "page": 1, "limit": 20, "total": 143, "totalPages": 8 }
+    }
+    ```
+
+servers:
+  - url: https://fragancio-elegancio.vercel.app/api
+    description: Producción (Vercel)
+  - url: http://localhost:3000/api
+    description: Desarrollo local
+
+tags:
+  - name: Catálogo
+    description: Exploración pública de productos. No requiere autenticación.
+  - name: Carrito
+    description: Gestión del carrito de compras. Solo compradores.
+  - name: Checkout
+    description: Proceso de compra y creación de órdenes. Solo compradores.
+  - name: Pedidos
+    description: Historial de órdenes. Compradores ven las suyas; vendedores pueden actualizar estado.
+  - name: Inventario
+    description: Gestión de productos propios. Solo vendedores.
+  - name: Recomendaciones
+    description: Motor de similitud por notas olfativas. Público.
+  - name: Envíos
+    description: Seguimiento y actualización de envíos.
+  - name: Pagos
+    description: Webhook de confirmación de pagos del proveedor externo.
+  - name: Auth
+    description: Endpoints internos de autenticación y sincronización con Clerk.
+  - name: Sistema
+    description: Health check y diagnóstico.
+
+# ─── PATHS ────────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── CATÁLOGO ────────────────────────────────────────────────────────────────
+
+  /catalogo:
+    get:
+      summary: Listar productos disponibles
+      tags: [Catálogo]
+      description: >
+        Devuelve productos con stock > 0, paginados. Soporta búsqueda libre
+        por nombre/marca y filtros por categoría y notas olfativas.
+      parameters:
+        - in: query
+          name: q
+          description: Búsqueda libre por nombre o marca (insensible a mayúsculas)
+          schema:
+            type: string
+          example: Chanel
+        - in: query
+          name: categoria
+          description: ID de categoría para filtrar
+          schema:
+            type: integer
+          example: 3
+        - in: query
+          name: notas
+          description: Fragmento a buscar en notas de salida, corazón o fondo
+          schema:
+            type: string
+          example: Rose
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+      responses:
+        '200':
+          description: Lista de productos paginada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Producto'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              example:
+                data:
+                  - id_producto: 5
+                    nombre: Bleu de Chanel
+                    marca: Chanel
+                    precio: 45000
+                    stock: 12
+                    concentracion: Eau de Parfum
+                    imagen_url: null
+                    notas_salida: Lemon, Bergamot, Mint
+                    notas_corazon: Ginger, Geranium
+                    notas_fondo: Incense, Vetiver, Musk
+                    categorias: []
+                    variantes: []
+                pagination:
+                  page: 1
+                  limit: 20
+                  total: 1
+                  totalPages: 1
+
+  # ── CARRITO ─────────────────────────────────────────────────────────────────
+
+  /carrito:
+    get:
+      summary: Obtener el carrito activo del comprador
+      tags: [Carrito]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Carrito activo con ítems y total calculado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarritoDetalle'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+    post:
+      summary: Agregar o actualizar un ítem en el carrito
+      tags: [Carrito]
+      security:
+        - bearerAuth: []
+      description: >
+        Si el producto ya existe en el carrito, reemplaza la cantidad.
+        Si no existe, lo agrega. Valida stock disponible antes de confirmar.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_producto, cantidad]
+              properties:
+                id_producto:
+                  type: integer
+                  description: ID del producto a agregar
+                  example: 42
+                cantidad:
+                  type: integer
+                  minimum: 1
+                  description: Cantidad deseada
+                  example: 2
+      responses:
+        '200':
+          description: Ítem agregado o actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  id_carrito:
+                    type: integer
+                    example: 7
+        '400':
+          description: id_producto o cantidad inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                id_invalido:
+                  value:
+                    error:
+                      code: ID_INVALIDO
+                      message: "El campo 'id_producto' debe ser un entero positivo."
+                cantidad_invalida:
+                  value:
+                    error:
+                      code: CANTIDAD_INVALIDA
+                      message: "El campo 'cantidad' debe ser un entero positivo."
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          description: Producto no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: PRODUCTO_NO_ENCONTRADO
+                  message: No existe un producto con id 42.
+        '409':
+          description: Stock insuficiente para la cantidad solicitada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: STOCK_INSUFICIENTE
+                  message: No hay suficiente stock disponible para la cantidad solicitada.
+                  details: "Stock disponible: 3, solicitado: 10"
+
+    delete:
+      summary: Quitar un ítem del carrito
+      tags: [Carrito]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_producto]
+              properties:
+                id_producto:
+                  type: integer
+                  example: 42
+      responses:
+        '204':
+          description: Ítem eliminado. Sin body.
+        '400':
+          $ref: '#/components/responses/InputInvalido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '404':
+          description: Carrito activo no encontrado para este usuario
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: CARRITO_NO_ENCONTRADO
+                  message: No existe un carrito activo para este usuario.
+
+  # ── CHECKOUT ────────────────────────────────────────────────────────────────
+
+  /checkout:
+    post:
+      summary: Confirmar compra y crear orden desde el carrito activo
+      tags: [Checkout]
+      security:
+        - bearerAuth: []
+      description: |
+        Crea una `OrdenCompra` a partir del carrito activo del comprador.
+
+        **Atomicidad:** El stock se valida y decrementa dentro de una única transacción
+        de base de datos (`prisma.$transaction`) para prevenir sobreventa bajo concurrencia.
+
+        **Reserva:** La orden queda en estado `pendiente` durante 5 minutos.
+        Si el pago no se confirma en ese tiempo, el stock puede liberarse manualmente.
+
+        **Pago:** El pago se confirma via webhook en `POST /pagos/webhook`.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                direccion_envio:
+                  type: string
+                  description: >
+                    Dirección de envío. Si no se provee, se usa la guardada en el perfil
+                    del comprador. Si ninguna existe, el request falla con 400.
+                  example: Av. Corrientes 1234, Buenos Aires
+      responses:
+        '201':
+          description: Orden creada exitosamente
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema:
+                type: string
+              example: /api/pedidos/7
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_pedido:
+                    type: integer
+                    example: 7
+                  importe_total:
+                    type: number
+                    format: float
+                    example: 45000.00
+                  estado:
+                    type: string
+                    example: pendiente
+                  reservacion_minutos:
+                    type: integer
+                    example: 5
+        '400':
+          description: Carrito vacío o dirección de envío faltante
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                carrito_vacio:
+                  value:
+                    error:
+                      code: CARRITO_VACIO
+                      message: El carrito no tiene productos. Agregá al menos uno antes de hacer checkout.
+                sin_direccion:
+                  value:
+                    error:
+                      code: DIRECCION_REQUERIDA
+                      message: Se requiere una dirección de envío.
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: Solo compradores pueden hacer checkout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ACCESO_DENEGADO
+                  message: Solo los compradores pueden realizar el proceso de compra.
+        '409':
+          description: Stock insuficiente para algún producto durante la transacción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: CHECKOUT_FALLIDO
+                  message: "Stock insuficiente para \"Bleu de Chanel\": disponible 1, solicitado 2"
+
+  # ── PEDIDOS ─────────────────────────────────────────────────────────────────
+
+  /pedidos:
+    get:
+      summary: Listar órdenes de compra del comprador autenticado
+      tags: [Pedidos]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        '200':
+          description: Lista paginada de órdenes, ordenadas por fecha descendente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OrdenResumen'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+  /pedidos/{id}:
+    get:
+      summary: Obtener detalle completo de una orden
+      tags: [Pedidos]
+      security:
+        - bearerAuth: []
+      description: >
+        Compradores solo pueden ver sus propias órdenes.
+        Vendedores pueden ver cualquier orden.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: ID de la orden de compra
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Detalle de la orden con ítems, pago y envío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrdenDetalle'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: El comprador intenta ver una orden ajena
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ACCESO_DENEGADO
+                  message: No tenés permiso para ver este pedido.
+        '404':
+          description: Orden no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: PEDIDO_NO_ENCONTRADO
+                  message: No existe un pedido con id 7.
+
+    patch:
+      summary: Actualizar estado de una orden (solo vendedores)
+      tags: [Pedidos]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          example: 7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado:
+                  type: string
+                  enum: [enviado, entregado, cancelado]
+                  description: Nuevo estado de la orden
+                  example: enviado
+      responses:
+        '200':
+          description: Estado actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_pedido:
+                    type: integer
+                    example: 7
+                  estado:
+                    type: string
+                    example: enviado
+                  enviado:
+                    type: boolean
+                    example: true
+        '400':
+          description: Estado inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ESTADO_INVALIDO
+                  message: "El estado debe ser uno de: enviado, entregado, cancelado."
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: Solo vendedores pueden actualizar el estado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/PedidoNoEncontrado'
+
+  # ── INVENTARIO ──────────────────────────────────────────────────────────────
+
+  /inventario:
+    get:
+      summary: Listar productos del inventario del vendedor
+      tags: [Inventario]
+      security:
+        - bearerAuth: []
+      description: Devuelve solo los productos asociados al vendedor autenticado via `ProveedorProducto`.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        '200':
+          description: Lista paginada de productos del vendedor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductoInventario'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+    post:
+      summary: Crear un nuevo producto en el inventario
+      tags: [Inventario]
+      security:
+        - bearerAuth: []
+      description: >
+        Crea el producto y lo asocia al vendedor via `ProveedorProducto`.
+        El par (nombre, marca) debe ser único en el sistema.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoInput'
+            example:
+              nombre: Bleu de Chanel
+              marca: Chanel
+              precio: 45000
+              stock: 50
+              concentracion: Eau de Parfum
+              notas_salida: Lemon, Bergamot, Mint
+              notas_corazon: Ginger, Geranium
+              notas_fondo: Incense, Vetiver, Musk
+      responses:
+        '201':
+          description: Producto creado exitosamente
+          headers:
+            Location:
+              schema:
+                type: string
+              example: /api/inventario/42
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id_producto:
+                    type: integer
+                    example: 42
+                  nombre:
+                    type: string
+                    example: Bleu de Chanel
+                  marca:
+                    type: string
+                    example: Chanel
+        '400':
+          description: Campos obligatorios faltantes o valores inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                campo_requerido:
+                  value:
+                    error:
+                      code: CAMPO_REQUERIDO
+                      message: "El campo 'nombre' es obligatorio."
+                precio_invalido:
+                  value:
+                    error:
+                      code: PRECIO_INVALIDO
+                      message: "El campo 'precio' debe ser un número mayor o igual a cero."
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '409':
+          description: Ya existe un producto con ese nombre y marca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: PRODUCTO_DUPLICADO
+                  message: Ya existe un producto con ese nombre y marca.
+
+  /inventario/{id}:
+    get:
+      summary: Obtener un producto del inventario propio
+      tags: [Inventario]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+          example: 42
+      responses:
+        '200':
+          description: Producto encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoInventario'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: El producto existe pero no pertenece al vendedor autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ACCESO_DENEGADO
+                  message: Este producto no pertenece a tu inventario.
+        '404':
+          $ref: '#/components/responses/ProductoNoEncontrado'
+
+    put:
+      summary: Actualizar un producto del inventario (reemplazo parcial)
+      tags: [Inventario]
+      security:
+        - bearerAuth: []
+      description: >
+        Solo se actualizan los campos enviados en el body. Los campos omitidos no cambian.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductoInput'
+      responses:
+        '200':
+          description: Producto actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductoInventario'
+        '400':
+          $ref: '#/components/responses/InputInvalido'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: El producto no pertenece al vendedor autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/ProductoNoEncontrado'
+        '409':
+          description: Ya existe otro producto con ese nombre y marca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: Desvincular un producto del inventario del vendedor
+      tags: [Inventario]
+      security:
+        - bearerAuth: []
+      description: >
+        Elimina el vínculo `ProveedorProducto` entre el vendedor y el producto.
+        El producto en sí no se borra del sistema (puede tener otros vendedores o historial de pedidos).
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Producto desvinculado. Sin body.
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: El producto no pertenece al vendedor autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/ProductoNoEncontrado'
+
+  # ── RECOMENDACIONES ─────────────────────────────────────────────────────────
+
+  /recomendaciones:
+    get:
+      summary: Obtener productos similares a uno dado
+      tags: [Recomendaciones]
+      description: |
+        Calcula similitud usando el **índice de Jaccard** sobre notas olfativas e ingredientes.
+
+        **Pesos aplicados:**
+        | Campo          | Peso |
+        |----------------|------|
+        | notas_corazon  | 40%  |
+        | notas_salida   | 30%  |
+        | notas_fondo    | 20%  |
+        | ingredientes   | 10%  |
+
+        Solo incluye productos con stock > 0, ordenados de mayor a menor similitud.
+      parameters:
+        - in: query
+          name: productoId
+          required: true
+          description: ID del producto base para calcular similitudes
+          schema:
+            type: integer
+          example: 5
+        - in: query
+          name: limit
+          description: Cantidad máxima de recomendaciones (máximo 20)
+          schema:
+            type: integer
+            default: 6
+            minimum: 1
+            maximum: 20
+      responses:
+        '200':
+          description: Lista de productos recomendados ordenados por similitud descendente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductoRecomendado'
+                  total:
+                    type: integer
+                    description: Cantidad de recomendaciones devueltas
+                    example: 6
+        '400':
+          description: Parámetro productoId faltante o inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                faltante:
+                  value:
+                    error:
+                      code: PARAM_REQUERIDO
+                      message: "El parámetro 'productoId' es obligatorio."
+                invalido:
+                  value:
+                    error:
+                      code: ID_INVALIDO
+                      message: "El parámetro 'productoId' debe ser un entero positivo."
+        '404':
+          description: Producto base no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: PRODUCTO_NO_ENCONTRADO
+                  message: No existe un producto con id 5.
+
+  # ── ENVÍOS ──────────────────────────────────────────────────────────────────
+
+  /envios/{id}:
+    get:
+      summary: Obtener estado de envío de una orden
+      tags: [Envíos]
+      security:
+        - bearerAuth: []
+      description: >
+        El `{id}` es el **id_pedido** (ID de la orden), no el id_envio interno.
+        Compradores solo pueden ver el envío de sus propios pedidos.
+      parameters:
+        - in: path
+          name: id
+          description: ID de la orden de compra
+          required: true
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '200':
+          description: Información del envío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envio'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: El comprador intenta ver el envío de un pedido ajeno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No existe un envío para esta orden (aún no se confirmó el pago)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ENVIO_NO_ENCONTRADO
+                  message: No existe un envío asociado a la orden 7.
+
+    patch:
+      summary: Actualizar estado o código de seguimiento del envío (solo vendedores)
+      tags: [Envíos]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          description: ID de la orden de compra
+          required: true
+          schema:
+            type: integer
+          example: 7
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                estado:
+                  type: string
+                  enum: [preparando, en_camino, entregado]
+                  description: Nuevo estado del envío
+                  example: en_camino
+                track_code:
+                  type: string
+                  description: Código de seguimiento del transportista
+                  example: OCA-2026-789456
+      responses:
+        '200':
+          description: Envío actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Envio'
+        '400':
+          description: Estado inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ESTADO_INVALIDO
+                  message: "El estado del envío debe ser uno de: preparando, en_camino, entregado."
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+        '403':
+          description: Solo vendedores pueden actualizar el estado del envío
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Envío no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── PAGOS ───────────────────────────────────────────────────────────────────
+
+  /pagos/webhook:
+    post:
+      summary: Webhook de confirmación de pago del proveedor externo
+      tags: [Pagos]
+      description: |
+        Endpoint llamado por el proveedor de pagos (Stripe / MercadoPago) al confirmarse
+        o rechazarse un pago.
+
+        **Seguridad:** La firma HMAC-SHA256 del payload (con `WEBHOOK_SECRET`) se verifica
+        en el header `X-Webhook-Signature`. Requests sin firma válida son rechazados con 401.
+
+        **Flujo al aprobarse el pago:**
+        1. `Pago.estado` → `aprobado`
+        2. `OrdenCompra.estado` → `aprobado`
+        3. Se crea la `Factura` correspondiente
+        4. Se crea el registro `Envio` con `estado = preparando`
+      parameters:
+        - in: header
+          name: X-Webhook-Signature
+          required: true
+          description: Firma HMAC-SHA256 del body usando la clave WEBHOOK_SECRET
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_pedido, estado]
+              properties:
+                id_pedido:
+                  type: integer
+                  description: ID interno de la orden de compra
+                  example: 7
+                estado:
+                  type: string
+                  enum: [aprobado, rechazado]
+                  example: aprobado
+                provider_reference:
+                  type: string
+                  description: ID del pago en el sistema del proveedor externo
+                  example: MP-2026-789456
+      responses:
+        '200':
+          description: Webhook procesado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+                  nro_factura:
+                    type: string
+                    nullable: true
+                    description: Número de factura generada (solo si el pago fue aprobado)
+                    example: clz9abc123def456
+        '400':
+          description: Payload inválido o estado desconocido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Firma ausente o inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: FIRMA_INVALIDA
+                  message: La firma del webhook es inválida o ausente.
+        '404':
+          description: Orden no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: El pago ya fue procesado anteriormente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: PAGO_YA_PROCESADO
+                  message: Este pago ya fue confirmado anteriormente.
+
+  # ── AUTH ────────────────────────────────────────────────────────────────────
+
+  /auth/onboarding:
+    post:
+      summary: Asignar rol al usuario durante el onboarding inicial
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      description: >
+        Crea el perfil `Comprador` o `Vendedor` en la BD local y actualiza
+        los `publicMetadata` en Clerk para que el rol quede en el JWT.
+        Se llama una sola vez al registrarse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [comprador, vendedor]
+                  example: comprador
+      responses:
+        '200':
+          description: Rol asignado y perfil creado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '400':
+          description: Rol inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error:
+                  code: ROL_INVALIDO
+                  message: "El rol debe ser 'comprador' o 'vendedor'."
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
+
+  /auth/webhook:
+    post:
+      summary: Webhook interno de Clerk — sincroniza usuarios en la BD local
+      tags: [Auth]
+      description: |
+        Endpoint llamado por Clerk cuando se crea un usuario nuevo (`user.created`).
+        Crea el registro `Usuario` en la BD local.
+
+        La autenticidad se verifica usando las cabeceras Svix (`svix-id`, `svix-timestamp`, `svix-signature`).
+        Este endpoint no requiere JWT de Clerk — es llamado server-to-server.
+      parameters:
+        - in: header
+          name: svix-id
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: svix-timestamp
+          required: true
+          schema:
+            type: string
+        - in: header
+          name: svix-signature
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Payload de evento Svix. Ver documentación de Clerk para el formato exacto.
+      responses:
+        '200':
+          description: Evento procesado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    example: true
+        '400':
+          description: Cabeceras Svix faltantes o firma inválida
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Error de configuración del servidor (CLERK_WEBHOOK_SECRET no definido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ── SISTEMA ─────────────────────────────────────────────────────────────────
+
+  /health:
+    get:
+      summary: Verificar estado del servidor y la conexión a la BD
+      tags: [Sistema]
+      description: Endpoint de diagnóstico. No requiere autenticación.
+      responses:
+        '200':
+          description: Sistema operativo y BD conectada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  db:
+                    type: string
+                    example: connected
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: '2026-06-03T10:00:00.000Z'
+        '500':
+          description: Error de conexión a la base de datos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  db:
+                    type: string
+                    example: connection_failed
+                  timestamp:
+                    type: string
+                    format: date-time
+
+# ─── COMPONENTES REUTILIZABLES ────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT emitido por Clerk. Incluirlo en el header → `Authorization: Bearer <token>`
+
+  # ── Respuestas reutilizables ─────────────────────────────────────────────────
+
+  responses:
+    NoAutenticado:
+      description: No autenticado o rol incorrecto
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NO_AUTENTICADO
+              message: Autenticación requerida. Solo compradores pueden acceder al carrito.
+
+    InputInvalido:
+      description: Datos de entrada inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    ProductoNoEncontrado:
+      description: Producto no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: PRODUCTO_NO_ENCONTRADO
+              message: No existe un producto con id 42.
+
+    PedidoNoEncontrado:
+      description: Pedido no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: PEDIDO_NO_ENCONTRADO
+              message: No existe un pedido con id 7.
+
+  # ── Schemas ──────────────────────────────────────────────────────────────────
+
+  schemas:
+
+    Error:
+      type: object
+      description: Envelope de error uniforme en toda la API
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: >
+                Código de error en SNAKE_UPPER_CASE. Identifica el tipo de falla de negocio
+                de forma programática — el cliente puede hacer `switch` sobre este campo.
+              example: STOCK_INSUFICIENTE
+            message:
+              type: string
+              description: Descripción legible del error en español
+              example: No hay suficiente stock disponible para la cantidad solicitada.
+            details:
+              type: string
+              description: Información adicional opcional (contexto extra, diferencias, etc.)
+              example: "Stock disponible: 3, solicitado: 10"
+
+    Pagination:
+      type: object
+      description: Metadatos de paginación incluidos en todas las respuestas de colección
+      properties:
+        page:
+          type: integer
+          description: Página actual (base 1)
+          example: 1
+        limit:
+          type: integer
+          description: Cantidad de ítems por página
+          example: 20
+        total:
+          type: integer
+          description: Total de ítems en la colección (sin paginar)
+          example: 143
+        totalPages:
+          type: integer
+          description: Total de páginas disponibles
+          example: 8
+
+    Producto:
+      type: object
+      description: Producto del catálogo público
+      properties:
+        id_producto:
+          type: integer
+          example: 5
+        nombre:
+          type: string
+          example: Bleu de Chanel
+        marca:
+          type: string
+          example: Chanel
+        precio:
+          type: number
+          format: float
+          example: 45000.00
+        stock:
+          type: integer
+          example: 12
+        concentracion:
+          type: string
+          nullable: true
+          example: Eau de Parfum
+        imagen_url:
+          type: string
+          nullable: true
+          example: "https://cdn.example.com/bleu.jpg"
+        notas_salida:
+          type: string
+          nullable: true
+          description: Notas de cabeza (primeros 15 minutos). Valores separados por coma.
+          example: "Lemon, Bergamot, Mint"
+        notas_corazon:
+          type: string
+          nullable: true
+          description: Notas de corazón (carácter principal del perfume)
+          example: "Ginger, Iso E Super, Geranium"
+        notas_fondo:
+          type: string
+          nullable: true
+          description: Notas de fondo (persistencia, base)
+          example: "Incense, Vetiver, White Musk"
+        categorias:
+          type: array
+          items:
+            type: object
+            properties:
+              categoria:
+                type: object
+                properties:
+                  id_categoria:
+                    type: integer
+                  nombre:
+                    type: string
+                    example: Amaderado
+        variantes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variante'
+
+    ProductoInventario:
+      allOf:
+        - $ref: '#/components/schemas/Producto'
+        - type: object
+          properties:
+            ingredientes:
+              type: string
+              nullable: true
+              description: Lista de ingredientes INCI del perfume
+              example: "Alcohol Denat., Aqua, Fragrance (Parfum)"
+
+    ProductoRecomendado:
+      type: object
+      description: Producto recomendado por similitud olfativa
+      properties:
+        id_producto:
+          type: integer
+          example: 8
+        nombre:
+          type: string
+          example: Sauvage
+        marca:
+          type: string
+          example: Dior
+        precio:
+          type: number
+          format: float
+          example: 38000.00
+        concentracion:
+          type: string
+          nullable: true
+          example: Eau de Toilette
+        notas_salida:
+          type: string
+          nullable: true
+          example: "Bergamot, Pepper"
+        notas_corazon:
+          type: string
+          nullable: true
+          example: "Lavender, Geranium"
+        notas_fondo:
+          type: string
+          nullable: true
+          example: "Ambroxan, Vetiver, Musk"
+
+    ProductoInput:
+      type: object
+      description: Body para crear o actualizar un producto en el inventario
+      required: [nombre, marca, precio]
+      properties:
+        nombre:
+          type: string
+          example: Bleu de Chanel
+        marca:
+          type: string
+          example: Chanel
+        precio:
+          type: number
+          format: float
+          minimum: 0
+          example: 45000
+        stock:
+          type: integer
+          minimum: 0
+          default: 0
+          example: 50
+        concentracion:
+          type: string
+          nullable: true
+          example: Eau de Parfum
+        ingredientes:
+          type: string
+          nullable: true
+          example: "Alcohol Denat., Aqua, Fragrance"
+        imagen_url:
+          type: string
+          nullable: true
+          example: "https://cdn.example.com/bleu.jpg"
+        notas_salida:
+          type: string
+          nullable: true
+          example: "Lemon, Bergamot"
+        notas_corazon:
+          type: string
+          nullable: true
+          example: "Rose, Jasmine"
+        notas_fondo:
+          type: string
+          nullable: true
+          example: "Vetiver, Musk"
+
+    Variante:
+      type: object
+      description: Variante de un producto por volumen y precio diferente
+      properties:
+        id_variante_producto:
+          type: integer
+          example: 3
+        volumen:
+          type: number
+          format: float
+          description: Volumen en ml
+          example: 50.0
+        precio:
+          type: number
+          format: float
+          example: 35000.00
+        stock:
+          type: integer
+          example: 8
+
+    CarritoDetalle:
+      type: object
+      description: Carrito activo con sus ítems y total calculado
+      properties:
+        id_carrito:
+          type: integer
+          nullable: true
+          description: null si el usuario no tiene carrito activo todavía
+          example: 7
+        fecha_creada:
+          type: string
+          format: date-time
+          example: '2026-06-03T10:00:00.000Z'
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              cantidad:
+                type: integer
+                example: 2
+              producto:
+                type: object
+                properties:
+                  id_producto:
+                    type: integer
+                    example: 5
+                  nombre:
+                    type: string
+                    example: Bleu de Chanel
+                  marca:
+                    type: string
+                    example: Chanel
+                  precio:
+                    type: number
+                    format: float
+                    example: 45000.00
+                  stock:
+                    type: integer
+                    example: 12
+                  concentracion:
+                    type: string
+                    nullable: true
+                    example: Eau de Parfum
+        total:
+          type: number
+          format: float
+          description: Total del carrito en pesos (precio × cantidad de cada ítem)
+          example: 90000.00
+
+    OrdenResumen:
+      type: object
+      description: Resumen de una orden de compra para el listado
+      properties:
+        id_pedido:
+          type: integer
+          example: 7
+        fecha_creada:
+          type: string
+          format: date-time
+          example: '2026-06-03T10:00:00.000Z'
+        estado:
+          type: string
+          description: Estado de la orden — pendiente | aprobado | enviado | entregado | cancelado
+          example: pendiente
+        importe_total:
+          type: number
+          format: float
+          example: 45000.00
+        enviado:
+          type: boolean
+          example: false
+        pago:
+          type: object
+          nullable: true
+          properties:
+            id_pago:
+              type: integer
+            estado:
+              type: string
+              example: pendiente
+            total:
+              type: number
+              format: float
+        envio:
+          type: object
+          nullable: true
+          properties:
+            id_envio:
+              type: integer
+            estado:
+              type: string
+              example: preparando
+            track_code:
+              type: string
+              nullable: true
+
+    OrdenDetalle:
+      allOf:
+        - $ref: '#/components/schemas/OrdenResumen'
+        - type: object
+          properties:
+            direccion_envio:
+              type: string
+              example: Av. Corrientes 1234, Buenos Aires
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id_producto:
+                    type: integer
+                  cantidad:
+                    type: integer
+                  precio:
+                    type: number
+                    format: float
+                    description: Precio unitario al momento de la compra
+                  producto:
+                    type: object
+                    properties:
+                      nombre:
+                        type: string
+                      marca:
+                        type: string
+                      imagen_url:
+                        type: string
+                        nullable: true
+            pago:
+              type: object
+              nullable: true
+              properties:
+                id_pago:
+                  type: integer
+                total:
+                  type: number
+                  format: float
+                estado:
+                  type: string
+                fecha_emision:
+                  type: string
+                  format: date-time
+                factura:
+                  type: object
+                  nullable: true
+                  properties:
+                    nro_factura:
+                      type: string
+                    fecha_emision:
+                      type: string
+                      format: date-time
+                    importe_total:
+                      type: number
+                      format: float
+            envio:
+              $ref: '#/components/schemas/Envio'
+
+    Envio:
+      type: object
+      nullable: true
+      description: Información de envío de una orden. Es null si el pago aún no fue confirmado.
+      properties:
+        id_envio:
+          type: integer
+          example: 3
+        estado:
+          type: string
+          enum: [preparando, en_camino, entregado]
+          description: Estado actual del envío
+          example: preparando
+        track_code:
+          type: string
+          nullable: true
+          description: Código de seguimiento del transportista
+          example: OCA-2026-789456
+        direccion_envio:
+          type: string
+          example: Av. Corrientes 1234, Buenos Aires

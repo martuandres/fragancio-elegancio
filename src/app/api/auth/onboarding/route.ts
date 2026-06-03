@@ -1,27 +1,28 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
+import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 
+// POST /api/auth/onboarding — asignar rol al usuario y crear perfil comprador/vendedor
 export async function POST(req: NextRequest) {
   const { userId } = await auth();
-  if (!userId) return new Response("Unauthorized", { status: 401 });
+  if (!userId)
+    return apiError("NO_AUTENTICADO", "Se requiere autenticación para completar el onboarding.", 401);
 
   const { role } = (await req.json()) as { role: string };
-  if (role !== "comprador" && role !== "vendedor") {
-    return new Response("Invalid role", { status: 400 });
-  }
+  if (role !== "comprador" && role !== "vendedor")
+    return apiError("ROL_INVALIDO", "El rol debe ser 'comprador' o 'vendedor'.", 400);
 
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(userId);
   const email = clerkUser.emailAddresses[0]?.emailAddress;
-  if (!email) return new Response("No email found", { status: 400 });
+  if (!email)
+    return apiError("EMAIL_NO_ENCONTRADO", "No se encontró un email asociado a la cuenta de Clerk.", 400);
 
-  // Find or create Usuario (fallback if webhook didn't fire yet)
   let usuario = await prisma.usuario.findUnique({ where: { email } });
   if (!usuario) {
     const nombre =
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-      email;
+      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email;
     usuario = await prisma.usuario.create({
       data: { nombre, email, contrasena: "" },
     });
