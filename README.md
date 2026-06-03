@@ -36,7 +36,8 @@ El sistema está diseñado con una arquitectura de microservicios orientada a la
 | Actor | Tipo | Descripción |
 |---|---|---|
 | Comprador | Usuario interno | Usuario final que navega el catálogo, agrega productos al carrito y realiza compras. |
-| Vendedor / Proveedor | Usuario interno | Empresa o persona que ofrece productos en la plataforma. Gestiona su catálogo e inventario. |
+| Vendedor | Usuario interno | Persona que vende en la plataforma. Gestiona su catálogo e inventario. |
+| Proveedor | Entidad externa | Marca/empresa que suministra productos. Se registra con su `marca` como identificador. |
 | Sistema de Envíos | Sistema externo | Servicio tercerizado responsable de la entrega física de los pedidos y el tracking. |
 | Sistema de Pagos | Sistema externo | Pasarela de pago externa que procesa cobros y emite confirmaciones de transacción. |
 | Sistema de Proveeduría | Sistema externo | Recibe pedidos de restock cuando el stock de un producto cae a niveles críticos. |
@@ -107,41 +108,46 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | `nombre` | VARCHAR | Nombre completo. |
 | `email` | VARCHAR — UNIQUE | Correo electrónico único. |
 | `contraseña` | VARCHAR (hash) | Contraseña hasheada (gestionada por Clerk). |
-| `telefono` | VARCHAR | Número de teléfono de contacto. |
 
 #### Comprador *(hereda de Usuario)*
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
-| `id_usuario` | INT — PK/FK | Referencia al Usuario base. |
-| `saldo` | DECIMAL | Saldo disponible en la cuenta. |
+| `legajo` | VARCHAR — PK | Número de legajo del comprador. |
+| `id_usuario` | INT — FK UNIQUE | Referencia al Usuario base. |
 | `direccion_envio` | VARCHAR | Dirección predeterminada para el envío de pedidos. |
+| `telefono` | VARCHAR | Número de teléfono de contacto. |
 
 #### Vendedor *(hereda de Usuario)*
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
-| `id_usuario` | INT — PK/FK | Referencia al Usuario base. |
-| `legajo` | VARCHAR | Número de legajo o registro del vendedor. |
+| `legajo` | VARCHAR — PK | Número de legajo del vendedor. |
+| `id_usuario` | INT — FK UNIQUE | Referencia al Usuario base. |
+| `saldo` | DECIMAL | Saldo acumulado por ventas. |
 | `cbu` | VARCHAR | CBU bancario para acreditar las ventas. |
-| `email_contacto` | VARCHAR | Email de contacto comercial. |
 | `reputacion` | DECIMAL | Puntuación de reputación. |
+
+#### Proveedor *(entidad independiente, no es Usuario)*
+
+| Atributo | Tipo | Descripción |
+|---|---|---|
+| `marca` | VARCHAR — PK | Nombre de la marca (identificador único). |
+| `telefono` | VARCHAR | Teléfono de contacto. |
+| `email_contacto` | VARCHAR | Email de contacto comercial. |
 
 #### Producto
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_producto` | INT — PK | Identificador único del producto. |
-| `marca` | VARCHAR — FK | Marca/proveedor. Parte de la PK compuesta con `id_producto`. |
+| `marca` | VARCHAR | Marca del producto. |
 | `nombre` | VARCHAR | Nombre comercial del producto. |
-| `precio` | DECIMAL | Precio base. |
 | `stock` | INT | Cantidad disponible en inventario. |
-| `concentracion` | VARCHAR | Tipo de concentración (EDT, EDP, Parfum, Cologne, etc.). |
-| `ingredientes` | TEXT | Lista de ingredientes del perfume. |
+| `ingrediente` | TEXT | Lista de ingredientes del perfume. |
 | `notas_salida` | TEXT | Notas olfativas de salida (top notes). |
 | `notas_corazon` | TEXT | Notas de corazón (heart notes). |
 | `notas_fondo` | TEXT | Notas de fondo (base notes). |
-| `proveedor` | VARCHAR — FK | Referencia al vendedor/proveedor. |
 
 #### Variante_Producto
 
@@ -151,14 +157,13 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | `id_producto` | INT — FK | Producto al que pertenece. |
 | `volumen` | DECIMAL | Volumen en ml de la presentación. |
 | `precio` | DECIMAL | Precio específico de esta variante. |
-| `stock` | INT | Stock disponible para esta variante. |
+| `concentracion` | VARCHAR | Tipo de concentración (EDT, EDP, Parfum, Cologne, etc.). |
 
 #### Categoría
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_categoria` | INT — PK | Identificador único de la categoría. |
-| `nombre` | VARCHAR | Nombre (ej. Floral, Amaderado, Oriental). |
 | `criterio` | VARCHAR | Descripción del tipo de categoría. |
 
 #### Carrito
@@ -166,32 +171,17 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_carrito` | INT — PK | Identificador único del carrito. |
-| `id_usuario` | INT — FK | Usuario propietario. |
+| `legajo` | VARCHAR — FK | Comprador propietario (FK a Comprador.legajo). |
 | `fecha_creada` | DATETIME | Fecha y hora de creación. |
 | `estado` | ENUM | `activo` / `abandonado` / `convertido`. |
-
-#### Orden de Compra
-
-| Atributo | Tipo | Descripción |
-|---|---|---|
-| `id_pedido` | INT — PK | Identificador único del pedido. |
-| `id_usuario` | INT — FK | Usuario que realizó el pedido. |
-| `id_carrito` | INT — FK UNIQUE | Carrito que originó el pedido. |
-| `fecha_creada` | DATETIME | Fecha y hora de creación. |
-| `estado` | ENUM | `pendiente` / `confirmado` / `en camino` / `entregado` / `cancelado`. |
-| `importe_total` | DECIMAL | Monto total del pedido. |
-| `enviado` | BOOLEAN | Indica si el pedido fue despachado. |
-| `direccion_envio` | VARCHAR | Dirección de entrega confirmada. |
 
 #### Pago
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_pago` | INT — PK | Identificador único del pago. |
-| `id_pedido` | INT — FK UNIQUE | Pedido al que corresponde. |
-| `total` | DECIMAL | Monto abonado. |
+| `id_carrito` | INT — FK UNIQUE | Carrito al que corresponde. |
 | `estado` | ENUM | `pendiente` / `aprobado` / `rechazado` / `reembolsado`. |
-| `fecha_emision` | DATETIME | Fecha y hora de procesamiento. |
 
 #### Factura
 
@@ -199,7 +189,6 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 |---|---|---|
 | `nro_factura` | VARCHAR — PK | Número único de factura. |
 | `id_pago` | INT — FK UNIQUE | Pago al que corresponde. |
-| `id_pedido` | INT — FK | Pedido facturado. |
 | `fecha_emision` | DATETIME | Fecha de emisión del comprobante. |
 | `importe_total` | DECIMAL | Monto total facturado. |
 
@@ -208,32 +197,30 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_envio` | INT — PK | Identificador único del envío. |
-| `id_pedido` | INT — FK UNIQUE | Pedido al que pertenece. |
+| `id_carrito` | INT — FK UNIQUE | Carrito al que pertenece. |
 | `track_code` | VARCHAR | Código de seguimiento del sistema externo. |
 | `estado` | ENUM | `preparando` / `en tránsito` / `entregado` / `devuelto`. |
-| `direccion_envio` | VARCHAR | Dirección de destino. |
 
 ### 3.2 Tablas de Relación (Junction Tables)
 
 | Tabla | Descripción |
 |---|---|
-| `Carrito_Producto` | Relaciona un Carrito con los Productos (y variantes) que contiene, incluyendo la `cantidad`. |
+| `Carrito_Producto` | Relaciona un Carrito con los Productos que contiene, incluyendo la `cantidad`. |
 | `Producto_Categoria` | Relación N:M entre Producto y Categoría. |
-| `Producto_OrdenCompra` | Productos incluidos en una Orden con `cantidad` y `precio` al momento de la compra. |
-| `Proveedor_Producto` | Relaciona Vendedores con los Productos que proveen. |
+| `Proveedor_Producto` | Relaciona Proveedores (por `marca`) con los Productos que suministran. |
+| `Producto_VarianteProducto` | Relaciona Producto con sus Variante_Producto. |
 
 ### 3.3 Relaciones entre Entidades
 
 - Un **Usuario** puede ser **Comprador** o **Vendedor** (herencia / EsUn).
-- Un **Comprador** tiene 0 o más **Carritos**; un Carrito pertenece a 1 Comprador.
-- Un **Carrito** contiene 1 o más **Productos** (vía `Carrito_Producto` con cantidad).
-- Un **Carrito** genera 0 o 1 **Orden de Compra**.
-- Una **Orden de Compra** necesita 1 **Pago**; un Pago corresponde a 1 Orden.
+- Un **Comprador** tiene 0 o más **Carritos**; un Carrito pertenece a 1 Comprador (FK via `legajo`).
+- Un **Carrito** contiene 1 o más **Productos** (vía `Carrito_Producto` con `cantidad`).
+- Un **Carrito** tiene 0 o 1 **Pago** directo; un Pago corresponde a 1 Carrito.
 - Un **Pago** genera 1 **Factura**.
-- Una **Orden de Compra** genera 1 **Envío**.
-- Un **Producto** tiene 1 o más **Variantes_Producto**.
-- Un **Producto** pertenece a 1 o más **Categorías**.
-- Un **Vendedor** ofrece 1 o más **Productos**.
+- Un **Carrito** tiene 0 o 1 **Envío** directo; un Envío corresponde a 1 Carrito.
+- Un **Producto** tiene 1 o más **Variantes_Producto** (precio y concentración por variante).
+- Un **Producto** pertenece a 0 o más **Categorías**.
+- Un **Proveedor** suministra 0 o más **Productos** (vía `Proveedor_Producto`).
 
 ---
 
@@ -241,50 +228,55 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 
 ```prisma
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Usuario {
-  id_usuario Int       @id @default(autoincrement())
+  id_usuario Int        @id @default(autoincrement())
   nombre     String
-  email      String    @unique
+  email      String     @unique
   contrasena String
-  telefono   String?
   comprador  Comprador?
   vendedor   Vendedor?
 }
 
 model Comprador {
-  id_usuario      Int      @id
-  saldo           Decimal  @default(0)
+  legajo          String    @id
+  id_usuario      Int       @unique
   direccion_envio String?
-  usuario         Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+  telefono        String?
+  usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario])
   carritos        Carrito[]
 }
 
 model Vendedor {
-  id_usuario     Int      @id
-  legajo         String   @unique
-  cbu            String
+  legajo     String   @id
+  id_usuario Int      @unique
+  saldo      Decimal  @default(0)
+  cbu        String
+  reputacion Decimal  @default(0)
+  usuario    Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+}
+
+model Proveedor {
+  marca          String              @id
+  telefono       String?
   email_contacto String
-  reputacion     Decimal  @default(0)
-  usuario        Usuario  @relation(fields: [id_usuario], references: [id_usuario])
   productos      ProveedorProducto[]
 }
 
 model Producto {
-  id_producto   Int      @id @default(autoincrement())
+  id_producto   Int                 @id @default(autoincrement())
   marca         String
   nombre        String
-  precio        Decimal
-  stock         Int      @default(0)
-  concentracion String?
-  ingredientes  String?
+  stock         Int                 @default(0)
+  ingrediente   String?
+  imagen_url    String?
   notas_salida  String?
   notas_corazon String?
   notas_fondo   String?
@@ -292,7 +284,8 @@ model Producto {
   categorias    ProductoCategoria[]
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
-  ordenItems    ProductoOrden[]
+
+  @@unique([nombre, marca])
 }
 
 model VarianteProducto {
@@ -300,13 +293,12 @@ model VarianteProducto {
   id_producto          Int
   volumen              Decimal
   precio               Decimal
-  stock                Int      @default(0)
+  concentracion        String?
   producto             Producto @relation(fields: [id_producto], references: [id_producto])
 }
 
 model Categoria {
-  id_categoria Int                @id @default(autoincrement())
-  nombre       String
+  id_categoria Int                 @id @default(autoincrement())
   criterio     String?
   productos    ProductoCategoria[]
 }
@@ -316,25 +308,28 @@ model ProductoCategoria {
   id_categoria Int
   producto     Producto  @relation(fields: [id_producto], references: [id_producto])
   categoria    Categoria @relation(fields: [id_categoria], references: [id_categoria])
+
   @@id([id_producto, id_categoria])
 }
 
 model ProveedorProducto {
-  id_usuario  Int
+  marca       String
   id_producto Int
-  vendedor    Vendedor  @relation(fields: [id_usuario], references: [id_usuario])
+  proveedor   Proveedor @relation(fields: [marca], references: [marca])
   producto    Producto  @relation(fields: [id_producto], references: [id_producto])
-  @@id([id_usuario, id_producto])
+
+  @@id([marca, id_producto])
 }
 
 model Carrito {
   id_carrito   Int               @id @default(autoincrement())
-  id_usuario   Int
+  legajo       String
   fecha_creada DateTime          @default(now())
   estado       String            @default("activo")
-  comprador    Comprador         @relation(fields: [id_usuario], references: [id_usuario])
+  comprador    Comprador         @relation(fields: [legajo], references: [legajo])
   items        CarritoProducto[]
-  orden        OrdenCompra?
+  pago         Pago?
+  envio        Envio?
 }
 
 model CarritoProducto {
@@ -343,60 +338,32 @@ model CarritoProducto {
   cantidad    Int
   carrito     Carrito  @relation(fields: [id_carrito], references: [id_carrito])
   producto    Producto @relation(fields: [id_producto], references: [id_producto])
+
   @@id([id_carrito, id_producto])
 }
 
-model OrdenCompra {
-  id_pedido       Int            @id @default(autoincrement())
-  id_usuario      Int
-  id_carrito      Int            @unique
-  fecha_creada    DateTime       @default(now())
-  estado          String         @default("pendiente")
-  importe_total   Decimal
-  enviado         Boolean        @default(false)
-  direccion_envio String
-  carrito         Carrito        @relation(fields: [id_carrito], references: [id_carrito])
-  items           ProductoOrden[]
-  pago            Pago?
-  envio           Envio?
-}
-
-model ProductoOrden {
-  id_pedido   Int
-  id_producto Int
-  cantidad    Int
-  precio      Decimal
-  orden       OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
-  producto    Producto    @relation(fields: [id_producto], references: [id_producto])
-  @@id([id_pedido, id_producto])
-}
-
 model Pago {
-  id_pago       Int         @id @default(autoincrement())
-  id_pedido     Int         @unique
-  total         Decimal
-  estado        String      @default("pendiente")
-  fecha_emision DateTime    @default(now())
-  orden         OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
-  factura       Factura?
+  id_pago    Int      @id @default(autoincrement())
+  id_carrito Int      @unique
+  estado     String   @default("pendiente")
+  carrito    Carrito  @relation(fields: [id_carrito], references: [id_carrito])
+  factura    Factura?
 }
 
 model Factura {
   nro_factura   String   @id @default(cuid())
   id_pago       Int      @unique
-  id_pedido     Int
   fecha_emision DateTime @default(now())
   importe_total Decimal
   pago          Pago     @relation(fields: [id_pago], references: [id_pago])
 }
 
 model Envio {
-  id_envio        Int         @id @default(autoincrement())
-  id_pedido       Int         @unique
-  track_code      String?
-  estado          String      @default("preparando")
-  direccion_envio String
-  orden           OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
+  id_envio   Int      @id @default(autoincrement())
+  id_carrito Int      @unique
+  track_code String?
+  estado     String   @default("preparando")
+  carrito    Carrito  @relation(fields: [id_carrito], references: [id_carrito])
 }
 ```
 

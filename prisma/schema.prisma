@@ -12,26 +12,32 @@ model Usuario {
   nombre     String
   email      String     @unique
   contrasena String
-  telefono   String?
   comprador  Comprador?
   vendedor   Vendedor?
 }
 
 model Comprador {
-  id_usuario      Int       @id
-  saldo           Decimal   @default(0)
+  legajo          String    @id
+  id_usuario      Int       @unique
   direccion_envio String?
+  telefono        String?
   usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario])
   carritos        Carrito[]
 }
 
 model Vendedor {
-  id_usuario     Int                 @id
-  legajo         String              @unique
-  cbu            String
+  legajo     String   @id
+  id_usuario Int      @unique
+  saldo      Decimal  @default(0)
+  cbu        String
+  reputacion Decimal  @default(0)
+  usuario    Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+}
+
+model Proveedor {
+  marca          String              @id
+  telefono       String?
   email_contacto String
-  reputacion     Decimal             @default(0)
-  usuario        Usuario             @relation(fields: [id_usuario], references: [id_usuario])
   productos      ProveedorProducto[]
 }
 
@@ -39,10 +45,8 @@ model Producto {
   id_producto   Int                 @id @default(autoincrement())
   marca         String
   nombre        String
-  precio        Decimal
   stock         Int                 @default(0)
-  concentracion String?
-  ingredientes  String?
+  ingrediente   String?
   imagen_url    String?
   notas_salida  String?
   notas_corazon String?
@@ -51,8 +55,6 @@ model Producto {
   categorias    ProductoCategoria[]
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
-  ordenItems    ProductoOrden[]
-  
 
   @@unique([nombre, marca])
 }
@@ -62,13 +64,12 @@ model VarianteProducto {
   id_producto          Int
   volumen              Decimal
   precio               Decimal
-  stock                Int      @default(0)
+  concentracion        String?
   producto             Producto @relation(fields: [id_producto], references: [id_producto])
 }
 
 model Categoria {
   id_categoria Int                 @id @default(autoincrement())
-  nombre       String
   criterio     String?
   productos    ProductoCategoria[]
 }
@@ -83,22 +84,23 @@ model ProductoCategoria {
 }
 
 model ProveedorProducto {
-  id_usuario  Int
+  marca       String
   id_producto Int
-  vendedor    Vendedor @relation(fields: [id_usuario], references: [id_usuario])
-  producto    Producto @relation(fields: [id_producto], references: [id_producto])
+  proveedor   Proveedor @relation(fields: [marca], references: [marca])
+  producto    Producto  @relation(fields: [id_producto], references: [id_producto])
 
-  @@id([id_usuario, id_producto])
+  @@id([marca, id_producto])
 }
 
 model Carrito {
   id_carrito   Int               @id @default(autoincrement())
-  id_usuario   Int
+  legajo       String
   fecha_creada DateTime          @default(now())
   estado       String            @default("activo")
-  comprador    Comprador         @relation(fields: [id_usuario], references: [id_usuario])
+  comprador    Comprador         @relation(fields: [legajo], references: [legajo])
   items        CarritoProducto[]
-  orden        OrdenCompra?
+  pago         Pago?
+  envio        Envio?
 }
 
 model CarritoProducto {
@@ -111,58 +113,26 @@ model CarritoProducto {
   @@id([id_carrito, id_producto])
 }
 
-model OrdenCompra {
-  id_pedido       Int             @id @default(autoincrement())
-  id_usuario      Int
-  id_carrito      Int             @unique
-  fecha_creada    DateTime        @default(now())
-  estado          String          @default("pendiente")
-  importe_total   Decimal
-  enviado         Boolean         @default(false)
-  direccion_envio String
-  carrito         Carrito         @relation(fields: [id_carrito], references: [id_carrito])
-  items           ProductoOrden[]
-  pago            Pago?
-  envio           Envio?
-}
-
-model ProductoOrden {
-  id_pedido   Int
-  id_producto Int
-  cantidad    Int
-  precio      Decimal
-  orden       OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
-  producto    Producto    @relation(fields: [id_producto], references: [id_producto])
-
-  @@id([id_pedido, id_producto])
-}
-
 model Pago {
-  id_pago       Int         @id @default(autoincrement())
-  id_pedido     Int         @unique
-  total         Decimal
-  estado        String      @default("pendiente")
-  fecha_emision DateTime    @default(now())
-  orden         OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
-  factura       Factura?
+  id_pago    Int      @id @default(autoincrement())
+  id_carrito Int      @unique
+  estado     String   @default("pendiente")
+  carrito    Carrito  @relation(fields: [id_carrito], references: [id_carrito])
+  factura    Factura?
 }
 
 model Factura {
   nro_factura   String   @id @default(cuid())
   id_pago       Int      @unique
-  id_pedido     Int
   fecha_emision DateTime @default(now())
   importe_total Decimal
   pago          Pago     @relation(fields: [id_pago], references: [id_pago])
 }
 
 model Envio {
-  id_envio        Int         @id @default(autoincrement())
-  id_pedido       Int         @unique
-  track_code      String?
-  estado          String      @default("preparando")
-  direccion_envio String
-  orden           OrdenCompra @relation(fields: [id_pedido], references: [id_pedido])
+  id_envio   Int      @id @default(autoincrement())
+  id_carrito Int      @unique
+  track_code String?
+  estado     String   @default("preparando")
+  carrito    Carrito  @relation(fields: [id_carrito], references: [id_carrito])
 }
-
-

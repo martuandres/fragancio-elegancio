@@ -1,8 +1,13 @@
 # Modelo Entidad-Relación — Fragancio Elegancio
 
+## Para qué sirve el modelo E-R
+
+El modelo E-R (Entidad-Relación) sirve para **diseñar y visualizar la estructura de una base de datos antes de crearla**. Actúa como un plano visual que traduce las necesidades del negocio a datos organizados, detallando qué información se va a guardar y cómo se relacionan sus elementos.
+
+Es un diagrama **conceptual**: muestra entidades, sus atributos propios y las relaciones entre ellas. No muestra cómo se implementan esas relaciones a nivel de columnas (eso lo hace el modelado de datos en `modelado-datos.md`). Por eso pueden tener diferencias — no son inconsistencias, son niveles de abstracción distintos.
+
 Este documento describe el modelo E-R tal como está definido en el diagrama oficial del proyecto.
-Es la fuente de verdad para la estructura de datos. Donde difiera del README o del schema Prisma,
-prevalece este documento.
+Es la fuente de verdad conceptual de la estructura de datos.
 
 ---
 
@@ -45,7 +50,7 @@ prevalece este documento.
 | `nombre`        | Nombre comercial                                |
 | `marca`         | Marca del producto (FK a Proveedor)             |
 | `stock`         | Cantidad disponible en inventario               |
-| `ingredientes`  | Lista de ingredientes                           |
+| `ingrediente`   | Lista de ingredientes                           |
 | `notas_salida`  | Notas olfativas de salida (top notes)           |
 | `notas_corazon` | Notas de corazón (heart notes)                  |
 | `notas_fondo`   | Notas de fondo (base notes)                     |
@@ -126,11 +131,9 @@ prevalece este documento.
 Usuario ──EsUn──► Vendedor
         └─EsUn──► Comprador
 
-Proveedor ──1..*── ofrece ──0..*──► Variante_Producto
-                                            │
-                                       1..* │ tiene (ranking)
-                                            ▼
-Categoria ──1..*── pertenece ──0..*──► Producto
+Proveedor ──0..*── ofrece ──1..*──► Producto ◄──1..*── tiene ──1── Variante_Producto
+                                        ▲
+                    Categoria ──1..*── pertenece ──0..*──┘
 
 Comprador ──1── tiene ──0..*──► Carrito ──tiene (cantidad)──0..*──► Producto
                                     │
@@ -140,15 +143,3 @@ Comprador ──1── tiene ──0..*──► Carrito ──tiene (cantidad)
 
 ---
 
-## Diferencias con el README / schema Prisma
-
-Estas son las discrepancias detectadas entre el diagrama ER oficial y el README:
-
-| Tema | Diagrama ER (fuente de verdad) | README / schema actual |
-|------|-------------------------------|------------------------|
-| `Proveedor` | Entidad separada de `Vendedor`, con marca/telefono/email_contacto | Tratado como sinónimo de `Vendedor` |
-| `concentracion` | Atributo de `Variante_Producto` | En `Producto` |
-| `legajo` en Comprador | Sí existe | No aparece en README |
-| `OrdenCompra` | No aparece como entidad explícita; `Carrito` tiene `id_carrito` y se relaciona directo con `Pago` y `Envio` | `OrdenCompra` es una entidad separada |
-
-Al implementar el schema Prisma, alinear con este documento.
