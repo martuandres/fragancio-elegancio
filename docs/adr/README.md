@@ -18,3 +18,4 @@ Registro de decisiones arquitectónicas del sistema. Cada ADR documenta el conte
 | Pipeline 2 — Confirmación de Pago, Facturación y Alta de Envío | ADR-003, ADR-004 |
 | Pipeline 3 — Checkout Atómico con Reserva de Stock | ADR-001, ADR-004 |
 | Transversal (todos los pipelines) | ADR-005 |
+
