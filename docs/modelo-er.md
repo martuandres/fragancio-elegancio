@@ -64,8 +64,9 @@ Es la fuente de verdad conceptual de la estructura de datos.
 | `precio`              | Precio de esta presentación              |
 | `volumen`             | Volumen en ml                            |
 | `concentracion`       | Tipo (EDT, EDP, Parfum, Cologne, etc.)   |
+| `ranking`             | Orden/ranking de la variante dentro del producto |
 
-> **Nota:** `concentracion` pertenece a `Variante_Producto`, no a `Producto`.
+> **Nota:** `concentracion` y `ranking` pertenecen a `Variante_Producto`, no a `Producto`. La relación con Producto es 1:N: una variante pertenece a exactamente un producto.
 
 ### Categoria
 | Atributo      | Descripción                                     |
@@ -117,7 +118,7 @@ Es la fuente de verdad conceptual de la estructura de datos.
 | Relación                              | Cardinalidad    | Atributos de relación | Descripción                                      |
 |---------------------------------------|-----------------|-----------------------|--------------------------------------------------|
 | Proveedor **ofrece** Producto | 0..* a 1..*    | —                     | Un proveedor ofrece 0 o más productos y un Producto tiene uno o mas proveedores        |
-| Variante_Producto **tiene** Producto  | 1..* a 1..*     | `ranking`             | Una variante tiene a uno o mas productos; un producto tiene una o mas variantes |
+| Producto **tiene** Variante_Producto  | 1 a 0..*        | —                     | Un producto tiene cero o más variantes; una variante pertenece a exactamente un producto |
 | Producto **pertenece** Categoria      | 1..* a 0..*     | —                     | Un producto puede estar en 1 o mas categorías y una categoria puede tener 0 o mas productos |
 | Comprador **tiene** Carrito           | 0..* a 1        | —                     | Un comprador puede tener cero o más carritos y un carrito tiene a un comprador    |
 | Carrito **tiene** Producto            | 1..* a 0..*     | `cantidad`            | Un carrito contiene uno o más productos y un producto esta contenido en 0 o mas carritos |
@@ -133,7 +134,7 @@ Es la fuente de verdad conceptual de la estructura de datos.
 Usuario ──EsUn──► Vendedor
         └─EsUn──► Comprador
 
-Proveedor ──0..*── ofrece ──1..*──► Producto ◄──1..*── tiene ──1..*── Variante_Producto
+Proveedor ──0..*── ofrece ──1..*──► Producto ──1── tiene ──0..*──► Variante_Producto
                                         ▲
                     Categoria ──1..*── pertenece ──0..*──┘
 

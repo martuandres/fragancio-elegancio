@@ -113,8 +113,8 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
-| `legajo` | VARCHAR — PK | Número de legajo del comprador. |
-| `id_usuario` | INT — FK UNIQUE | Referencia al Usuario base. |
+| `id_usuario` | INT — PK + FK | Identificador heredado de Usuario; actúa a la vez como FK hacia la tabla base. |
+| `legajo` | VARCHAR — UNIQUE | Número de legajo del comprador (atributo propio, no identificador de tabla). |
 | `direccion_envio` | VARCHAR | Dirección predeterminada para el envío de pedidos. |
 | `telefono` | VARCHAR | Número de teléfono de contacto. |
 
@@ -122,8 +122,8 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
-| `legajo` | VARCHAR — PK | Número de legajo del vendedor. |
-| `id_usuario` | INT — FK UNIQUE | Referencia al Usuario base. |
+| `id_usuario` | INT — PK + FK | Identificador heredado de Usuario; actúa a la vez como FK hacia la tabla base. |
+| `legajo` | VARCHAR — UNIQUE | Número de legajo del vendedor (atributo propio, no identificador de tabla). |
 | `saldo` | DECIMAL | Saldo acumulado por ventas. |
 | `cbu` | VARCHAR | CBU bancario para acreditar las ventas. |
 | `reputacion` | DECIMAL | Puntuación de reputación. |
@@ -154,10 +154,11 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_variante_producto` | INT — PK | Identificador único de la variante. |
-| `id_producto` | INT — FK | Producto al que pertenece. |
+| `id_producto` | INT — FK | Producto al que pertenece (relación 1:N directa). |
 | `volumen` | DECIMAL | Volumen en ml de la presentación. |
 | `precio` | DECIMAL | Precio específico de esta variante. |
 | `concentracion` | VARCHAR | Tipo de concentración (EDT, EDP, Parfum, Cologne, etc.). |
+| `ranking` | INT | Orden de la variante dentro del producto. |
 
 #### Categoría
 
@@ -171,7 +172,7 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_carrito` | INT — PK | Identificador único del carrito. |
-| `legajo` | VARCHAR — FK | Comprador propietario (FK a Comprador.legajo). |
+| `id_usuario` | INT — FK | Comprador propietario (FK a Comprador.id_usuario). |
 | `fecha_creada` | DATETIME | Fecha y hora de creación. |
 | `estado` | ENUM | `activo` / `abandonado` / `convertido`. |
 
@@ -208,12 +209,11 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | `Carrito_Producto` | Relaciona un Carrito con los Productos que contiene, incluyendo la `cantidad`. |
 | `Producto_Categoria` | Relación N:M entre Producto y Categoría. |
 | `Proveedor_Producto` | Relaciona Proveedores (por `marca`) con los Productos que suministran. |
-| `Producto_VarianteProducto` | Relaciona Producto con sus Variante_Producto. |
 
 ### 3.3 Relaciones entre Entidades
 
 - Un **Usuario** puede ser **Comprador** o **Vendedor** (herencia / EsUn).
-- Un **Comprador** tiene 0 o más **Carritos**; un Carrito pertenece a 1 Comprador (FK via `legajo`).
+- Un **Comprador** tiene 0 o más **Carritos**; un Carrito pertenece a 1 Comprador (FK via `id_usuario`).
 - Un **Carrito** contiene 1 o más **Productos** (vía `Carrito_Producto` con `cantidad`).
 - Un **Carrito** tiene 0 o 1 **Pago** directo; un Pago corresponde a 1 Carrito.
 - Un **Pago** genera 1 **Factura**.
@@ -246,8 +246,8 @@ model Usuario {
 }
 
 model Comprador {
-  legajo          String    @id
-  id_usuario      Int       @unique
+  id_usuario      Int       @id
+  legajo          String    @unique
   direccion_envio String?
   telefono        String?
   usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario])
@@ -255,8 +255,8 @@ model Comprador {
 }
 
 model Vendedor {
-  legajo     String   @id
-  id_usuario Int      @unique
+  id_usuario Int      @id
+  legajo     String   @unique
   saldo      Decimal  @default(0)
   cbu        String
   reputacion Decimal  @default(0)
@@ -280,7 +280,7 @@ model Producto {
   notas_salida  String?
   notas_corazon String?
   notas_fondo   String?
-  variantes     VarianteProducto[]
+  variante      VarianteProducto[]
   categorias    ProductoCategoria[]
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
@@ -294,6 +294,7 @@ model VarianteProducto {
   volumen              Decimal
   precio               Decimal
   concentracion        String?
+  ranking              Int?
   producto             Producto @relation(fields: [id_producto], references: [id_producto])
 }
 
@@ -323,10 +324,10 @@ model ProveedorProducto {
 
 model Carrito {
   id_carrito   Int               @id @default(autoincrement())
-  legajo       String
+  id_usuario   Int
   fecha_creada DateTime          @default(now())
   estado       String            @default("activo")
-  comprador    Comprador         @relation(fields: [legajo], references: [legajo])
+  comprador    Comprador         @relation(fields: [id_usuario], references: [id_usuario])
   items        CarritoProducto[]
   pago         Pago?
   envio        Envio?

@@ -13,7 +13,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 * **Comprador**: legajo, direccion\_envio, telefono
 * **Vendedor**: legajo, reputación, saldo, cbu
 * **Producto:** id\_producto, nombre, ingrediente, notas\_salida, notas\_corazon, notas\_fondo, marca, stock
-* **Variante\_Producto**: id\_variante\_producto, volumen, concentración, precio
+* **Variante\_Producto**: id\_variante\_producto, volumen, concentración, precio, ranking
 * **Categoria**: id\_categoria, criterio
 * **Carrito:** id\_carrito, estado, fecha\_creada
 * **Pago:** id\_pago, estado
@@ -27,7 +27,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 * **Es un:** Usuario — Comprador: Todo comprador es un usuario
 * **Ofrece:** Proveedor (0..\*) — (1..\*) Producto: Un proveedor puede ofrecer cero o más productos; un producto tiene uno o más proveedores. Relación implementada mediante la tabla de unión Proveedor\_Producto.
 * **Pertenece:** Producto (1..\*) — Categoría (0..\*): Un producto pertenece a una o más categorías; una categoría puede tener cero o más productos (puede existir sin productos aún asignados).
-* **Tiene:** Variante\_Producto (1..\*) — (1..\*) Producto: Una variante tiene uno o más productos; un producto tiene una o más variantes. Relación implementada mediante la tabla de unión Producto\_Variante\_Producto.
+* **Tiene:** Producto (1) — (0..\*) Variante\_Producto: Un producto tiene cero o más variantes; una variante pertenece a exactamente un producto.
 * **Tiene:** Comprador (1) — (0..\*) Carrito: Un comprador puede tener cero o más carritos a lo largo del tiempo; cada carrito pertenece a un único comprador.
 * **Contiene {cantidad}:** Carrito (1) — (1..\*) Producto: Un carrito contiene uno o más productos; un mismo producto puede estar en ninguno o muchos carritos. La cantidad es un atributo propio de esta relación.
 * **Necesita:** Carrito (1) — (0..1) Pago: Un carrito puede tener como máximo un pago asociado; un pago corresponde a un único carrito.

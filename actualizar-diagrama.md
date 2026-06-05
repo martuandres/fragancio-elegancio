@@ -230,3 +230,42 @@ Este archivo registra todas las modificaciones realizadas a los documentos de ar
 | 78 | Relaciones — Lógica de Negocio | Cadena de relaciones reescrita. El Controlador Checkout pasa a ser el punto de entrada; Servicio Stock ATOMICIDAD es invocado por Checkout (no al revés); Sistema de Pagos confirma vía webhook disparando Servicio Notificación (async) y Servicio Envio. Historial de Pedidos e Historial de Entrega pasan a relacionarse con Fragance DB y Sistema de Envios respectivamente, como nodos independientes bajo Lógica de Negocio. |
 | 79 | Relaciones — Servicio de Entrega de Pedidos duplicado | Eliminada la aparición duplicada. El componente ahora vive solo en Lógica de Negocio. La relación `Sistema de Envios → Servicio de Entrega de Pedidos` se mantiene como relación de retorno (notificación de actualización de estado). |
 | 80 | Resumen de Tecnologías | Agregadas tecnologías Clerk y Next.js Page. Sign In Controller pasó de "Next.js API Route" a "Next.js Page". |
+
+---
+
+### prisma/schema.prisma + docs/modelado-datos.md — Corrección PK de Comprador y Vendedor
+
+| # | Sección | Cambio |
+|---|---|---|
+| 81 | `Comprador` | PK cambiada: `legajo String @id` → `id_usuario Int @id`. `legajo` pasa a ser atributo UNIQUE. La PK de tablas especializadas en herencia tabla-por-tipo debe ser la misma clave que en la tabla base, actuando a la vez como FK hacia `Usuario`. |
+| 82 | `Vendedor` | Ídem al punto 81: `id_usuario Int @id`, `legajo String @unique`. |
+| 83 | `Carrito` | FK hacia Comprador corregida: campo `legajo String` → `id_usuario Int`. La FK debe referenciar la PK de Comprador, que ahora es `id_usuario`. Relación actualizada a `@relation(fields: [id_usuario], references: [id_usuario])`. |
+| 84 | `modelado-datos.md` — tablas Comprador y Vendedor | Columnas reordenadas para reflejar el nuevo rol: `id_usuario` aparece primero como "PK + FK → usuario". `legajo` figura como "atributo propio (UNIQUE)". Agregadas notas explicativas en ambas tablas. |
+| 85 | `modelado-datos.md` — tabla Carrito | FK actualizada: columna `legajo` → `id_usuario`, rol "FK → Comprador". Nota actualizada para aclarar que `id_usuario` referencia la PK de Comprador y no `legajo`. |
+| 86 | `modelado-datos.md` — mapa de conexiones | Línea `Comprador ◄── Carrito (via legajo)` → `Comprador ◄── Carrito (via id_usuario)`. |
+
+---
+
+### prisma/schema.prisma + docs/modelado-datos.md + docs/modelo-er.md — Corrección relación Producto → Variante_Producto (N:M → 1:N)
+
+| # | Sección | Cambio |
+|---|---|---|
+| 87 | `VarianteProducto` (schema) | Agregada columna `id_producto Int` como FK directa a `Producto`. Agregado campo `ranking Int?` (antes era atributo de la tabla de unión). Agregada relación `producto Producto @relation(fields: [id_producto], references: [id_producto])`. |
+| 88 | `Producto` (schema) | Relación `variante` cambiada de `ProductoVarianteProducto[]` a `VarianteProducto[]`. La relación ahora es 1:N directa. |
+| 89 | `ProductoVarianteProducto` (schema) | **Modelo eliminado.** La tabla de unión no tiene sentido: una variante pertenece a exactamente un producto. La N:M era incorrecta. |
+| 90 | `modelado-datos.md` — tabla Variante_Producto | Agregadas columnas `id_producto` (FK → Producto) y `ranking`. Agregada nota explicando el cambio a 1:N y que `ranking` migró de la ex-tabla de unión. |
+| 91 | `modelado-datos.md` — tabla Producto-Variante_Producto | **Sección eliminada.** La tabla de unión ya no existe. |
+| 92 | `modelado-datos.md` — mapa de conexiones | Eliminadas las dos líneas que referenciaban `Producto-Variante_Producto`. Reemplazadas por `Producto ◄── Variante_Producto (via id_producto)`. |
+| 93 | `modelo-er.md` — atributos de Variante_Producto | Agregado atributo `ranking` a la tabla de atributos. Nota actualizada: `ranking` y `concentracion` son atributos propios de `Variante_Producto`; la relación con Producto es 1:N. |
+| 94 | `modelo-er.md` — tabla de relaciones | Fila `Variante_Producto tiene Producto \| 1..* a 1..* \| ranking` reemplazada por `Producto tiene Variante_Producto \| 1 a 0..* \| —`. La dirección y cardinalidad se corrigen: una variante pertenece a un único producto. El atributo `ranking` dejó de ser de la relación para pasar a `Variante_Producto`. Revierte el cambio del punto #68 (que incorrectamente forzaba N:M). |
+| 95 | `modelo-er.md` — diagrama ASCII | Flecha corregida: `◄──1..*── tiene ──1..*──` → `──1── tiene ──0..*──►`. |
+
+---
+
+### docs/casos-de-uso.md — Correcciones por consistencia con E-R y modelado de datos
+
+| # | Sección | Cambio |
+|---|---|---|
+| 96 | Entidades — Variante\_Producto | Agregado atributo `ranking`. Con la corrección 1:N, `ranking` pasó de ser atributo de la relación (tabla de unión) a ser atributo propio de la entidad. Consistente con E-R y schema Prisma actualizados. |
+| 97 | Relaciones — Tiene (Variante\_Producto) | Relación corregida: `Variante_Producto (1..*) — (1..*) Producto` → `Producto (1) — (0..*) Variante_Producto`. Eliminada la mención a la tabla de unión `Producto_Variante_Producto` (fue removida). Dirección y cardinalidad alineadas con el E-R actualizado (1:N). |
+
