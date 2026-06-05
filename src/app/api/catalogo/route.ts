@@ -24,14 +24,14 @@ export async function GET(req: NextRequest) {
     }),
     ...(notas && {
       OR: [
-        { notas_salida: { contains: notas, mode: "insensitive" as const } },
+        { notas_salida:  { contains: notas, mode: "insensitive" as const } },
         { notas_corazon: { contains: notas, mode: "insensitive" as const } },
-        { notas_fondo: { contains: notas, mode: "insensitive" as const } },
+        { notas_fondo:   { contains: notas, mode: "insensitive" as const } },
       ],
     }),
   };
 
-  const [productos, total] = await Promise.all([
+  const [raw, total] = await Promise.all([
     prisma.producto.findMany({
       where,
       skip,
@@ -40,22 +40,21 @@ export async function GET(req: NextRequest) {
         id_producto: true,
         nombre: true,
         marca: true,
-        precio: true,
         stock: true,
-        concentracion: true,
         imagen_url: true,
         notas_salida: true,
         notas_corazon: true,
         notas_fondo: true,
         categorias: {
-          select: { categoria: { select: { id_categoria: true, nombre: true } } },
+          select: { categoria: { select: { id_categoria: true, criterio: true } } },
         },
-        variantes: {
+        variante: {
+          orderBy: { ranking: "asc" as const },
           select: {
-            id_variante_producto: true,
-            volumen: true,
-            precio: true,
-            stock: true,
+            ranking: true,
+            variante: {
+              select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true },
+            },
           },
         },
       },
@@ -63,6 +62,24 @@ export async function GET(req: NextRequest) {
     }),
     prisma.producto.count({ where }),
   ]);
+
+  const productos = raw.map((p) => ({
+    id_producto: p.id_producto,
+    nombre: p.nombre,
+    marca: p.marca,
+    stock: p.stock,
+    imagen_url: p.imagen_url,
+    notas_salida: p.notas_salida,
+    notas_corazon: p.notas_corazon,
+    notas_fondo: p.notas_fondo,
+    categorias: p.categorias.map((c) => c.categoria),
+    variantes: p.variante.map((pv) => ({
+      ranking: pv.ranking,
+      ...pv.variante,
+      precio: Number(pv.variante.precio),
+      volumen: Number(pv.variante.volumen),
+    })),
+  }));
 
   return Response.json({
     data: productos,

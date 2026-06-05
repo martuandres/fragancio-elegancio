@@ -15,33 +15,33 @@ async function resolveComprador() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.usuario.findUnique({
-    where: { email },
-    select: { id_usuario: true },
+  return prisma.comprador.findFirst({
+    where: { usuario: { email } },
+    select: { legajo: true },
   });
 }
 
-async function getOrCreateCarritoActivo(id_usuario: number) {
+async function getOrCreateCarritoActivo(legajo: string) {
   const existing = await prisma.carrito.findFirst({
-    where: { id_usuario, estado: "activo" },
+    where: { legajo, estado: "activo" },
     select: { id_carrito: true },
   });
   if (existing) return existing;
 
   return prisma.carrito.create({
-    data: { id_usuario, estado: "activo" },
+    data: { legajo, estado: "activo" },
     select: { id_carrito: true },
   });
 }
 
 // GET /api/carrito — carrito activo del comprador con ítems y total
 export async function GET() {
-  const usuario = await resolveComprador();
-  if (!usuario)
+  const comprador = await resolveComprador();
+  if (!comprador)
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden acceder al carrito.", 401);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: usuario.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: {
       id_carrito: true,
       fecha_creada: true,
@@ -53,9 +53,14 @@ export async function GET() {
               id_producto: true,
               nombre: true,
               marca: true,
-              precio: true,
               stock: true,
-              concentracion: true,
+              variante: {
+                take: 1,
+                orderBy: { ranking: "asc" },
+                select: {
+                  variante: { select: { precio: true, concentracion: true } },
+                },
+              },
             },
           },
         },
@@ -65,18 +70,30 @@ export async function GET() {
 
   if (!carrito) return Response.json({ id_carrito: null, items: [], total: 0 });
 
-  const total = carrito.items.reduce(
-    (sum, item) => sum + Number(item.producto.precio) * item.cantidad,
-    0
-  );
+  const items = carrito.items.map((item) => {
+    const v = item.producto.variante[0]?.variante;
+    return {
+      cantidad: item.cantidad,
+      producto: {
+        id_producto: item.producto.id_producto,
+        nombre: item.producto.nombre,
+        marca: item.producto.marca,
+        stock: item.producto.stock,
+        precio: Number(v?.precio ?? 0),
+        concentracion: v?.concentracion ?? null,
+      },
+    };
+  });
 
-  return Response.json({ ...carrito, total });
+  const total = items.reduce((sum, item) => sum + item.producto.precio * item.cantidad, 0);
+
+  return Response.json({ id_carrito: carrito.id_carrito, fecha_creada: carrito.fecha_creada, items, total });
 }
 
 // POST /api/carrito — agregar o actualizar un ítem { id_producto, cantidad }
 export async function POST(req: NextRequest) {
-  const usuario = await resolveComprador();
-  if (!usuario)
+  const comprador = await resolveComprador();
+  if (!comprador)
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden modificar el carrito.", 401);
 
   const body = (await req.json()) as { id_producto?: unknown; cantidad?: unknown };
@@ -102,7 +119,7 @@ export async function POST(req: NextRequest) {
       `Stock disponible: ${producto.stock}, solicitado: ${cantidad}`
     );
 
-  const { id_carrito } = await getOrCreateCarritoActivo(usuario.id_usuario);
+  const { id_carrito } = await getOrCreateCarritoActivo(comprador.legajo);
 
   await prisma.carritoProducto.upsert({
     where: { id_carrito_id_producto: { id_carrito, id_producto } },
@@ -115,8 +132,8 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/carrito — quitar un ítem { id_producto }
 export async function DELETE(req: NextRequest) {
-  const usuario = await resolveComprador();
-  if (!usuario)
+  const comprador = await resolveComprador();
+  if (!comprador)
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden modificar el carrito.", 401);
 
   const body = (await req.json()) as { id_producto?: unknown };
@@ -126,7 +143,7 @@ export async function DELETE(req: NextRequest) {
     return apiError("ID_INVALIDO", "El campo 'id_producto' debe ser un entero positivo.", 400);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: usuario.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: { id_carrito: true },
   });
   if (!carrito)

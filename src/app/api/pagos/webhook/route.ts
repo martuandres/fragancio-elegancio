@@ -15,7 +15,7 @@ function verificarFirma(body: string, signature: string, secret: string): boolea
 }
 
 // POST /api/pagos/webhook — confirmación de pago desde proveedor externo (Stripe / MercadoPago)
-// Al aprobarse: actualiza Pago + OrdenCompra, crea Factura y crea registro de Envio
+// Al aprobarse: actualiza Pago, crea Factura y crea Envio
 export async function POST(req: Request) {
   const secret = process.env.WEBHOOK_SECRET;
   if (!secret)
@@ -27,65 +27,30 @@ export async function POST(req: Request) {
   if (!signature || !verificarFirma(rawBody, signature, secret))
     return apiError("FIRMA_INVALIDA", "La firma del webhook es inválida o ausente.", 401);
 
-  let body: { id_pedido?: unknown; estado?: unknown; provider_reference?: unknown };
+  let body: { id_carrito?: unknown; estado?: unknown };
   try {
     body = JSON.parse(rawBody);
   } catch {
     return apiError("PAYLOAD_INVALIDO", "El cuerpo del request no es JSON válido.", 400);
   }
 
-  const id_pedido = Number(body.id_pedido);
-  if (!Number.isInteger(id_pedido) || id_pedido <= 0)
-    return apiError("ID_INVALIDO", "El campo 'id_pedido' debe ser un entero positivo.", 400);
+  const id_carrito = Number(body.id_carrito);
+  if (!Number.isInteger(id_carrito) || id_carrito <= 0)
+    return apiError("ID_INVALIDO", "El campo 'id_carrito' debe ser un entero positivo.", 400);
 
   const estado = String(body.estado ?? "");
   if (!ESTADOS_PAGO.includes(estado as EstadoPago))
     return apiError("ESTADO_INVALIDO", `El campo 'estado' debe ser uno de: ${ESTADOS_PAGO.join(", ")}.`, 400);
 
   const pago = await prisma.pago.findUnique({
-    where: { id_pedido },
-    select: { id_pago: true, estado: true, id_pedido: true },
+    where: { id_carrito },
+    select: { id_pago: true, estado: true, id_carrito: true },
   });
 
-  if (!pago) {
-    const orden = await prisma.ordenCompra.findUnique({
-      where: { id_pedido },
-      select: { id_pedido: true, importe_total: true, direccion_envio: true },
-    });
-    if (!orden)
-      return apiError("PEDIDO_NO_ENCONTRADO", `No existe una orden con id ${id_pedido}.`, 404);
+  if (!pago)
+    return apiError("CARRITO_NO_ENCONTRADO", `No existe un pago asociado al carrito ${id_carrito}.`, 404);
 
-    // Crear el Pago si no existía (el checkout no lo crea automáticamente)
-    await prisma.pago.create({
-      data: { id_pedido, total: orden.importe_total, estado },
-    });
-
-    if (estado === "aprobado") {
-      await prisma.ordenCompra.update({ where: { id_pedido }, data: { estado: "aprobado" } });
-
-      const nuevoPago = await prisma.pago.findUnique({ where: { id_pedido }, select: { id_pago: true } });
-      const factura = await prisma.factura.create({
-        data: {
-          id_pago: nuevoPago!.id_pago,
-          id_pedido,
-          importe_total: orden.importe_total,
-        },
-        select: { nro_factura: true },
-      });
-
-      await prisma.envio.upsert({
-        where: { id_pedido },
-        create: { id_pedido, estado: "preparando", direccion_envio: orden.direccion_envio },
-        update: {},
-      });
-
-      return Response.json({ ok: true, nro_factura: factura.nro_factura });
-    }
-
-    return Response.json({ ok: true });
-  }
-
-  // El pago ya existe — verificar que no esté procesado
+  // Idempotencia: no reprocesar pagos ya aprobados
   if (pago.estado === "aprobado")
     return apiError("PAGO_YA_PROCESADO", "Este pago ya fue confirmado anteriormente.", 409);
 
@@ -95,25 +60,36 @@ export async function POST(req: Request) {
   });
 
   if (estado === "aprobado") {
-    const orden = await prisma.ordenCompra.findUnique({
-      where: { id_pedido },
-      select: { importe_total: true, direccion_envio: true },
+    // Calcular importe_total desde los ítems del carrito
+    const items = await prisma.carritoProducto.findMany({
+      where: { id_carrito },
+      select: {
+        cantidad: true,
+        producto: {
+          select: {
+            variante: {
+              take: 1,
+              orderBy: { ranking: "asc" as const },
+              select: { variante: { select: { precio: true } } },
+            },
+          },
+        },
+      },
     });
 
-    await prisma.ordenCompra.update({ where: { id_pedido }, data: { estado: "aprobado" } });
+    const importe_total = items.reduce((sum, item) => {
+      const precio = Number(item.producto.variante[0]?.variante?.precio ?? 0);
+      return sum + precio * item.cantidad;
+    }, 0);
 
     const factura = await prisma.factura.create({
-      data: {
-        id_pago: pago.id_pago,
-        id_pedido,
-        importe_total: orden!.importe_total,
-      },
+      data: { id_pago: pago.id_pago, importe_total },
       select: { nro_factura: true },
     });
 
     await prisma.envio.upsert({
-      where: { id_pedido },
-      create: { id_pedido, estado: "preparando", direccion_envio: orden!.direccion_envio },
+      where: { id_carrito },
+      create: { id_carrito, estado: "preparando" },
       update: {},
     });
 

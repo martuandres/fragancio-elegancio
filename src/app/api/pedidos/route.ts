@@ -15,16 +15,16 @@ async function resolveComprador() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.usuario.findUnique({
-    where: { email },
-    select: { id_usuario: true },
+  return prisma.comprador.findFirst({
+    where: { usuario: { email } },
+    select: { legajo: true },
   });
 }
 
-// GET /api/pedidos — historial de órdenes del comprador autenticado (paginado)
+// GET /api/pedidos — historial de compras del comprador (carritos convertidos con su pago)
 export async function GET(req: NextRequest) {
-  const usuario = await resolveComprador();
-  if (!usuario)
+  const comprador = await resolveComprador();
+  if (!comprador)
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden ver sus pedidos.", 401);
 
   const { searchParams } = req.nextUrl;
@@ -32,30 +32,27 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const skip = (page - 1) * limit;
 
-  const where = { id_usuario: usuario.id_usuario };
+  const where = { legajo: comprador.legajo, estado: { not: "activo" } };
 
-  const [ordenes, total] = await Promise.all([
-    prisma.ordenCompra.findMany({
+  const [carritos, total] = await Promise.all([
+    prisma.carrito.findMany({
       where,
       skip,
       take: limit,
       select: {
-        id_pedido: true,
+        id_carrito: true,
         fecha_creada: true,
         estado: true,
-        importe_total: true,
-        enviado: true,
-        direccion_envio: true,
-        pago: { select: { id_pago: true, estado: true, total: true } },
+        pago: { select: { id_pago: true, estado: true } },
         envio: { select: { id_envio: true, estado: true, track_code: true } },
       },
       orderBy: { fecha_creada: "desc" },
     }),
-    prisma.ordenCompra.count({ where }),
+    prisma.carrito.count({ where }),
   ]);
 
   return Response.json({
-    data: ordenes,
+    data: carritos,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
   });
 }

@@ -4,22 +4,23 @@ const RESERVATION_MINUTES = 5;
 
 export type CartItem = { id_producto: number; cantidad: number };
 
-/**
- * Validates stock and creates an OrdenCompra inside a single transaction.
- * Throws if any item is out of stock.
- */
-export async function checkoutAtomico(
-  id_usuario: number,
-  id_carrito: number,
-  items: CartItem[],
-  direccion_envio: string
-) {
+export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
   return prisma.$transaction(async (tx) => {
-    // Lock and validate stock for every item
+    let importe_total = 0;
+
     for (const item of items) {
       const producto = await tx.producto.findUnique({
         where: { id_producto: item.id_producto },
-        select: { id_producto: true, precio: true, stock: true, nombre: true },
+        select: {
+          id_producto: true,
+          stock: true,
+          nombre: true,
+          variante: {
+            take: 1,
+            orderBy: { ranking: "asc" as const },
+            select: { variante: { select: { precio: true } } },
+          },
+        },
       });
 
       if (!producto) throw new Error(`Producto ${item.id_producto} no existe`);
@@ -29,48 +30,25 @@ export async function checkoutAtomico(
         );
       }
 
-      // Reserve stock
       await tx.producto.update({
         where: { id_producto: item.id_producto },
         data: { stock: { decrement: item.cantidad } },
       });
+
+      const precio = Number(producto.variante[0]?.variante?.precio ?? 0);
+      importe_total += precio * item.cantidad;
     }
 
-    // Calculate total from current prices
-    const productosConPrecio = await tx.producto.findMany({
-      where: { id_producto: { in: items.map((i) => i.id_producto) } },
-      select: { id_producto: true, precio: true },
+    const pago = await tx.pago.create({
+      data: { id_carrito, estado: "pendiente" },
+      select: { id_pago: true, id_carrito: true, estado: true },
     });
 
-    const importe_total = items.reduce((sum, item) => {
-      const p = productosConPrecio.find((p) => p.id_producto === item.id_producto)!;
-      return sum + Number(p.precio) * item.cantidad;
-    }, 0);
-
-    // Create order
-    const orden = await tx.ordenCompra.create({
-      data: {
-        id_usuario,
-        id_carrito,
-        importe_total,
-        direccion_envio,
-        estado: "pendiente",
-        items: {
-          create: items.map((item) => ({
-            id_producto: item.id_producto,
-            cantidad: item.cantidad,
-            precio: productosConPrecio.find((p) => p.id_producto === item.id_producto)!.precio,
-          })),
-        },
-      },
-    });
-
-    // Mark cart as converted
     await tx.carrito.update({
       where: { id_carrito },
       data: { estado: "convertido" },
     });
 
-    return { orden, importe_total, reservationMinutes: RESERVATION_MINUTES };
+    return { pago, importe_total, reservationMinutes: RESERVATION_MINUTES };
   });
 }

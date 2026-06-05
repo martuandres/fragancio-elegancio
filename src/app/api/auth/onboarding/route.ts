@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   if (role === "comprador") {
     await prisma.comprador.upsert({
       where: { id_usuario: usuario.id_usuario },
-      create: { id_usuario: usuario.id_usuario },
+      create: { id_usuario: usuario.id_usuario, legajo: `legajo-${usuario.id_usuario}` },
       update: {},
     });
   } else {
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
         id_usuario: usuario.id_usuario,
         legajo: `legajo-${usuario.id_usuario}`,
         cbu: "",
-        email_contacto: email,
       },
       update: {},
     });

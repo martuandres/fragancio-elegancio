@@ -16,38 +16,44 @@ async function resolveVendedor() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.usuario.findUnique({
-    where: { email },
-    select: { id_usuario: true },
+  const vendedor = await prisma.vendedor.findFirst({
+    where: { usuario: { email } },
+    select: { legajo: true },
   });
+
+  return vendedor ? { ...vendedor, email } : null;
 }
 
-async function resolveProductoDelVendedor(vendedorId: number, productoId: number) {
+async function resolveProductoDelVendedor(legajo: string, id_producto: number) {
   return prisma.producto.findFirst({
     where: {
-      id_producto: productoId,
-      proveedores: { some: { id_usuario: vendedorId } },
+      id_producto,
+      proveedores: { some: { marca: legajo } },
     },
     select: {
       id_producto: true,
       nombre: true,
       marca: true,
-      precio: true,
       stock: true,
-      concentracion: true,
       imagen_url: true,
-      ingredientes: true,
+      ingrediente: true,
       notas_salida: true,
       notas_corazon: true,
       notas_fondo: true,
-      variantes: {
-        select: { id_variante_producto: true, volumen: true, precio: true, stock: true },
+      variante: {
+        orderBy: { ranking: "asc" as const },
+        select: {
+          ranking: true,
+          variante: {
+            select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true },
+          },
+        },
       },
     },
   });
 }
 
-// GET /api/inventario/[id] — obtener un producto específico del inventario del vendedor
+// GET /api/inventario/[id]
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -61,7 +67,7 @@ export async function GET(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const producto = await resolveProductoDelVendedor(vendedor.id_usuario, id_producto);
+  const producto = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
 
   if (!producto) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
@@ -70,10 +76,22 @@ export async function GET(
     return apiError("ACCESO_DENEGADO", "Este producto no pertenece a tu inventario.", 403);
   }
 
-  return Response.json(producto);
+  const v = producto.variante[0]?.variante;
+  return Response.json({
+    ...producto,
+    variante: undefined,
+    precio: Number(v?.precio ?? 0),
+    concentracion: v?.concentracion ?? null,
+    variantes: producto.variante.map((pv) => ({
+      ranking: pv.ranking,
+      ...pv.variante,
+      precio: Number(pv.variante.precio),
+      volumen: Number(pv.variante.volumen),
+    })),
+  });
 }
 
-// PUT /api/inventario/[id] — actualizar un producto del inventario del vendedor
+// PUT /api/inventario/[id]
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -87,7 +105,7 @@ export async function PUT(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const existente = await resolveProductoDelVendedor(vendedor.id_usuario, id_producto);
+  const existente = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
   if (!existente) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
     if (!existe)
@@ -96,14 +114,12 @@ export async function PUT(
   }
 
   const body = (await req.json()) as Record<string, unknown>;
-  const { nombre, marca, precio, stock, concentracion, ingredientes, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
+  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
 
   if (nombre !== undefined && (typeof nombre !== "string" || !String(nombre).trim()))
     return apiError("CAMPO_INVALIDO", "El campo 'nombre' no puede estar vacío.", 400);
   if (marca !== undefined && (typeof marca !== "string" || !String(marca).trim()))
     return apiError("CAMPO_INVALIDO", "El campo 'marca' no puede estar vacío.", 400);
-  if (precio !== undefined && (isNaN(Number(precio)) || Number(precio) < 0))
-    return apiError("PRECIO_INVALIDO", "El campo 'precio' debe ser un número mayor o igual a cero.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
 
@@ -113,10 +129,8 @@ export async function PUT(
       data: {
         ...(nombre !== undefined && { nombre: String(nombre).trim() }),
         ...(marca !== undefined && { marca: String(marca).trim() }),
-        ...(precio !== undefined && { precio: Number(precio) }),
         ...(stock !== undefined && { stock: Number(stock) }),
-        ...(concentracion !== undefined && { concentracion: concentracion ? String(concentracion) : null }),
-        ...(ingredientes !== undefined && { ingredientes: ingredientes ? String(ingredientes) : null }),
+        ...(ingrediente !== undefined && { ingrediente: ingrediente ? String(ingrediente) : null }),
         ...(imagen_url !== undefined && { imagen_url: imagen_url ? String(imagen_url) : null }),
         ...(notas_salida !== undefined && { notas_salida: notas_salida ? String(notas_salida) : null }),
         ...(notas_corazon !== undefined && { notas_corazon: notas_corazon ? String(notas_corazon) : null }),
@@ -126,11 +140,9 @@ export async function PUT(
         id_producto: true,
         nombre: true,
         marca: true,
-        precio: true,
         stock: true,
-        concentracion: true,
         imagen_url: true,
-        ingredientes: true,
+        ingrediente: true,
         notas_salida: true,
         notas_corazon: true,
         notas_fondo: true,
@@ -145,7 +157,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/inventario/[id] — desvincular un producto del inventario del vendedor
+// DELETE /api/inventario/[id]
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -159,7 +171,7 @@ export async function DELETE(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const existente = await resolveProductoDelVendedor(vendedor.id_usuario, id_producto);
+  const existente = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
   if (!existente) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
     if (!existe)
@@ -168,7 +180,7 @@ export async function DELETE(
   }
 
   await prisma.proveedorProducto.delete({
-    where: { id_usuario_id_producto: { id_usuario: vendedor.id_usuario, id_producto } },
+    where: { marca_id_producto: { marca: vendedor.legajo, id_producto } },
   });
 
   return new Response(null, { status: 204 });

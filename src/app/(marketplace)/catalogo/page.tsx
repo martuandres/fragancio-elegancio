@@ -22,17 +22,36 @@ const SELECT = {
   id_producto: true,
   nombre: true,
   marca: true,
-  precio: true,
   stock: true,
-  concentracion: true,
   imagen_url: true,
   notas_salida: true,
   notas_corazon: true,
   notas_fondo: true,
+  variante: {
+    take: 1,
+    orderBy: { ranking: "asc" as const },
+    select: {
+      variante: {
+        select: { precio: true, concentracion: true },
+      },
+    },
+  },
 } as const;
 
 function toProductoBase(p: Prisma.ProductoGetPayload<{ select: typeof SELECT }>): ProductoBase {
-  return { ...p, precio: Number(p.precio) };
+  const v = p.variante[0]?.variante;
+  return {
+    id_producto: p.id_producto,
+    nombre: p.nombre,
+    marca: p.marca,
+    stock: p.stock,
+    imagen_url: p.imagen_url,
+    notas_salida: p.notas_salida,
+    notas_corazon: p.notas_corazon,
+    notas_fondo: p.notas_fondo,
+    precio: Number(v?.precio ?? 0),
+    concentracion: v?.concentracion ?? null,
+  };
 }
 
 function extractNotes(
@@ -64,8 +83,8 @@ async function getFilteredProductos(q?: string, categoria?: string, genero?: str
           { notas_fondo:   { contains: kw, mode: "insensitive" as const } },
         ]),
       }] : []),
-      ...(genero        ? [{ concentracion: { contains: genero,        mode: "insensitive" as const } }] : []),
-      ...(concentracion ? [{ concentracion: { contains: concentracion, mode: "insensitive" as const } }] : []),
+      ...(genero        ? [{ variante: { some: { variante: { concentracion: { contains: genero,        mode: "insensitive" as const } } } } }] : []),
+      ...(concentracion ? [{ variante: { some: { variante: { concentracion: { contains: concentracion, mode: "insensitive" as const } } } } }] : []),
     ],
   };
 

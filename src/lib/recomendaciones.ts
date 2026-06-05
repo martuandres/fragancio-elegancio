@@ -3,11 +3,7 @@ import { prisma } from "./prisma";
 function tokenize(text: string | null): Set<string> {
   if (!text) return new Set();
   return new Set(
-    text
-      .toLowerCase()
-      .split(/[,\s]+/)
-      .map((t) => t.trim())
-      .filter(Boolean)
+    text.toLowerCase().split(/[,\s]+/).map((t) => t.trim()).filter(Boolean)
   );
 }
 
@@ -18,19 +14,10 @@ function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
   return intersection.size / union.size;
 }
 
-/**
- * Returns up to `limit` products most similar to the given product,
- * ranked by Jaccard similarity across olfactory notes and ingredients.
- */
 export async function getRecomendaciones(id_producto: number, limit = 6) {
   const base = await prisma.producto.findUnique({
     where: { id_producto },
-    select: {
-      notas_salida: true,
-      notas_corazon: true,
-      notas_fondo: true,
-      ingredientes: true,
-    },
+    select: { notas_salida: true, notas_corazon: true, notas_fondo: true, ingrediente: true },
   });
 
   if (!base) return [];
@@ -41,12 +28,15 @@ export async function getRecomendaciones(id_producto: number, limit = 6) {
       id_producto: true,
       nombre: true,
       marca: true,
-      precio: true,
-      concentracion: true,
       notas_salida: true,
       notas_corazon: true,
       notas_fondo: true,
-      ingredientes: true,
+      ingrediente: true,
+      variante: {
+        take: 1,
+        orderBy: { ranking: "asc" as const },
+        select: { variante: { select: { precio: true, concentracion: true } } },
+      },
     },
   });
 
@@ -55,8 +45,19 @@ export async function getRecomendaciones(id_producto: number, limit = 6) {
       jaccardSimilarity(tokenize(base.notas_salida), tokenize(p.notas_salida)) * 0.3 +
       jaccardSimilarity(tokenize(base.notas_corazon), tokenize(p.notas_corazon)) * 0.4 +
       jaccardSimilarity(tokenize(base.notas_fondo), tokenize(p.notas_fondo)) * 0.2 +
-      jaccardSimilarity(tokenize(base.ingredientes), tokenize(p.ingredientes)) * 0.1;
-    return { ...p, score };
+      jaccardSimilarity(tokenize(base.ingrediente), tokenize(p.ingrediente)) * 0.1;
+    const v = p.variante[0]?.variante;
+    return {
+      id_producto: p.id_producto,
+      nombre: p.nombre,
+      marca: p.marca,
+      precio: Number(v?.precio ?? 0),
+      concentracion: v?.concentracion ?? null,
+      notas_salida: p.notas_salida,
+      notas_corazon: p.notas_corazon,
+      notas_fondo: p.notas_fondo,
+      score,
+    };
   });
 
   return scored

@@ -16,11 +16,19 @@ async function resolveVendedor() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  return prisma.usuario.findUnique({
-    where: { email },
-    select: { id_usuario: true },
+  const vendedor = await prisma.vendedor.findFirst({
+    where: { usuario: { email } },
+    select: { legajo: true },
   });
+
+  return vendedor ? { ...vendedor, email } : null;
 }
+
+const VARIANTE_SELECT = {
+  take: 1,
+  orderBy: { ranking: "asc" as const },
+  select: { variante: { select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true } } },
+} as const;
 
 // GET /api/inventario — listar productos del vendedor autenticado (paginado)
 export async function GET(req: NextRequest) {
@@ -33,9 +41,9 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const skip = (page - 1) * limit;
 
-  const where = { proveedores: { some: { id_usuario: vendedor.id_usuario } } };
+  const where = { proveedores: { some: { marca: vendedor.legajo } } };
 
-  const [productos, total] = await Promise.all([
+  const [raw, total] = await Promise.all([
     prisma.producto.findMany({
       where,
       skip,
@@ -44,22 +52,28 @@ export async function GET(req: NextRequest) {
         id_producto: true,
         nombre: true,
         marca: true,
-        precio: true,
         stock: true,
-        concentracion: true,
         imagen_url: true,
-        ingredientes: true,
+        ingrediente: true,
         notas_salida: true,
         notas_corazon: true,
         notas_fondo: true,
-        variantes: {
-          select: { id_variante_producto: true, volumen: true, precio: true, stock: true },
-        },
+        variante: VARIANTE_SELECT,
       },
       orderBy: { id_producto: "asc" },
     }),
     prisma.producto.count({ where }),
   ]);
+
+  const productos = raw.map((p) => {
+    const v = p.variante[0]?.variante;
+    return {
+      ...p,
+      variante: undefined,
+      precio: Number(v?.precio ?? 0),
+      concentracion: v?.concentracion ?? null,
+    };
+  });
 
   return Response.json({
     data: productos,
@@ -74,31 +88,34 @@ export async function POST(req: NextRequest) {
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo vendedores pueden crear productos.", 401);
 
   const body = (await req.json()) as Record<string, unknown>;
-  const { nombre, marca, precio, stock, concentracion, ingredientes, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
+  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
 
   if (!nombre || typeof nombre !== "string" || !nombre.trim())
     return apiError("CAMPO_REQUERIDO", "El campo 'nombre' es obligatorio.", 400);
   if (!marca || typeof marca !== "string" || !marca.trim())
     return apiError("CAMPO_REQUERIDO", "El campo 'marca' es obligatorio.", 400);
-  if (precio === undefined || isNaN(Number(precio)) || Number(precio) < 0)
-    return apiError("PRECIO_INVALIDO", "El campo 'precio' debe ser un número mayor o igual a cero.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
+
+  // Ensure Proveedor exists for this vendedor (legajo is used as the supplier brand)
+  await prisma.proveedor.upsert({
+    where: { marca: vendedor.legajo },
+    create: { marca: vendedor.legajo, email_contacto: vendedor.email },
+    update: {},
+  });
 
   try {
     const producto = await prisma.producto.create({
       data: {
         nombre: String(nombre).trim(),
         marca: String(marca).trim(),
-        precio: Number(precio),
         stock: stock !== undefined ? Number(stock) : 0,
-        concentracion: concentracion ? String(concentracion) : null,
-        ingredientes: ingredientes ? String(ingredientes) : null,
+        ingrediente: ingrediente ? String(ingrediente) : null,
         imagen_url: imagen_url ? String(imagen_url) : null,
         notas_salida: notas_salida ? String(notas_salida) : null,
         notas_corazon: notas_corazon ? String(notas_corazon) : null,
         notas_fondo: notas_fondo ? String(notas_fondo) : null,
-        proveedores: { create: { id_usuario: vendedor.id_usuario } },
+        proveedores: { create: { marca: vendedor.legajo } },
       },
       select: { id_producto: true, nombre: true, marca: true },
     });
@@ -109,11 +126,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")
-      return apiError(
-        "PRODUCTO_DUPLICADO",
-        "Ya existe un producto con ese nombre y marca.",
-        409
-      );
+      return apiError("PRODUCTO_DUPLICADO", "Ya existe un producto con ese nombre y marca.", 409);
     throw err;
   }
 }

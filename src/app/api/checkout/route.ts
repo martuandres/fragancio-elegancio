@@ -2,10 +2,9 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { checkoutAtomico } from "@/lib/stock";
 import { apiError } from "@/lib/api-error";
-import { NextRequest } from "next/server";
 
-// POST /api/checkout — confirmar compra y crear orden desde el carrito activo
-export async function POST(req: NextRequest) {
+// POST /api/checkout — confirmar compra y crear pago pendiente desde el carrito activo
+export async function POST() {
   const { userId, sessionClaims } = await auth();
   if (!userId)
     return apiError("NO_AUTENTICADO", "Se requiere autenticación para hacer checkout.", 401);
@@ -20,27 +19,15 @@ export async function POST(req: NextRequest) {
   if (!email)
     return apiError("EMAIL_NO_ENCONTRADO", "No se encontró un email asociado a la cuenta.", 400);
 
-  const usuario = await prisma.usuario.findUnique({
-    where: { email },
-    select: {
-      id_usuario: true,
-      comprador: { select: { direccion_envio: true } },
-    },
+  const comprador = await prisma.comprador.findFirst({
+    where: { usuario: { email } },
+    select: { legajo: true },
   });
-  if (!usuario)
-    return apiError("USUARIO_NO_ENCONTRADO", "El usuario no existe en el sistema.", 404);
-
-  const body = (await req.json()) as { direccion_envio?: string };
-  const direccion_envio = body.direccion_envio?.trim() || usuario.comprador?.direccion_envio;
-  if (!direccion_envio)
-    return apiError(
-      "DIRECCION_REQUERIDA",
-      "Se requiere una dirección de envío. Podés proveerla en el body o guardarla en tu perfil.",
-      400
-    );
+  if (!comprador)
+    return apiError("USUARIO_NO_ENCONTRADO", "El comprador no existe en el sistema.", 404);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: usuario.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: {
       id_carrito: true,
       items: { select: { id_producto: true, cantidad: true } },
@@ -53,23 +40,19 @@ export async function POST(req: NextRequest) {
     return apiError("CARRITO_VACIO", "El carrito no tiene productos. Agregá al menos uno antes de hacer checkout.", 400);
 
   try {
-    const result = await checkoutAtomico(
-      usuario.id_usuario,
-      carrito.id_carrito,
-      carrito.items,
-      direccion_envio
-    );
+    const result = await checkoutAtomico(carrito.id_carrito, carrito.items);
 
     return Response.json(
       {
-        id_pedido: result.orden.id_pedido,
+        id_pago: result.pago.id_pago,
+        id_carrito: result.pago.id_carrito,
         importe_total: result.importe_total,
-        estado: result.orden.estado,
+        estado: result.pago.estado,
         reservacion_minutos: result.reservationMinutes,
       },
       {
         status: 201,
-        headers: { Location: `/api/pedidos/${result.orden.id_pedido}` },
+        headers: { Location: `/api/pedidos/${result.pago.id_carrito}` },
       }
     );
   } catch (err) {
