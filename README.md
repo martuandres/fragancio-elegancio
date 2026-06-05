@@ -393,7 +393,7 @@ model Envio {
 2. Agrega uno o más productos (variantes) al **Carrito**.
 3. Inicia el **Checkout**: el Controlador Checkout invoca al Servicio Stock ATOMICIDAD.
 4. El **Servicio Stock ATOMICIDAD** valida que haya stock real y reserva los ítems por **5 minutos**.
-5. Si la reserva es exitosa, se crea la **Orden de Compra** con estado `pendiente`.
+5. Si la reserva es exitosa, se crea el **Pago** con estado `pendiente` vinculado al Carrito.
 6. El sistema redirige al **Sistema de Pagos** externo.
 7. Confirmado el pago, se genera la **Factura** y el **Envío** con estado `preparando`.
 8. El **Servicio Notificación** envía un correo de confirmación de forma asíncrona.

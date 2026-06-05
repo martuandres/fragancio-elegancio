@@ -62,12 +62,15 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 |-----------------|------|------------------|
 | `id_producto`   | —    | PK               |
 | `nombre`        | —    |                  |
-| `marca`         | —    |    |
+| `marca`         | —    |                  |
 | `stock`         | —    |                  |
 | `ingrediente`   | —    |                  |
 | `notas_salida`  | —    |                  |
 | `notas_corazon` | —    |                  |
 | `notas_fondo`   | —    |                  |
+| `imagen_url`    | —    | opcional         |
+
+> `imagen_url` no aparece en el modelo E-R porque ese nivel es conceptual y no incluye detalles de implementación técnica (URLs, rutas de archivos, etc.). Sí se incluye acá porque el modelado de datos refleja las columnas reales de la base de datos.
 
 ---
 
@@ -89,11 +92,12 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 
 ---
 
-### Producto-Variante_Producto *(tabla de unión)*
+### Producto-Variante_Producto *(tabla de unión con atributo propio)*
 | Columna                | Tipo | Rol                         |
 |------------------------|------|-----------------------------|
 | `id_variante_producto` | —    | PK + FK → Variante_Producto |
 | `id_producto`          | —    | PK + FK → Producto          |
+| `ranking`              | —    | atributo propio             |
 
 ---
 

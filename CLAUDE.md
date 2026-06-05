@@ -67,15 +67,15 @@ npx prisma studio        # Browse the database
 Checkout uses `prisma.$transaction` with optimistic locking. The flow:
 1. Validate real stock inside the transaction
 2. Reserve items for 5 minutes (prevents overselling under concurrency)
-3. Create `OrdenCompra` with `estado = "pendiente"`
+3. Create `Pago` with `estado = "pendiente"` linked to the Carrito (no separate OrdenCompra entity)
 4. Release reservation automatically if payment is not completed within 5 minutes
 
 ### Data model highlights (from README)
 
 - `Usuario` is a base entity; `Comprador` and `Vendedor` reference it by PK (table-per-type inheritance)
-- `Carrito` → `OrdenCompra` is 1:0..1 (one cart becomes at most one order); `id_carrito` is `@unique` on `OrdenCompra`
-- Junction tables: `CarritoProducto`, `ProductoCategoria`, `ProductoOrden`, `ProveedorProducto`
-- `Pago` → `Factura` is 1:1; `OrdenCompra` → `Envio` is 1:1
+- `Carrito` → `Pago` is 1:0..1; `Carrito` → `Envio` is 1:0..1; `id_carrito` is `@unique` on both `Pago` and `Envio`
+- Junction tables: `CarritoProducto`, `ProductoCategoria`, `ProveedorProducto`
+- `Pago` → `Factura` is 1:1; `Carrito` → `Envio` is 1:1
 - The full Prisma schema is in README.md §4 — copy it verbatim to `prisma/schema.prisma` when bootstrapping
 
 ### Environment variables

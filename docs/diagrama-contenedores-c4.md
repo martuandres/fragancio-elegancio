@@ -25,7 +25,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 |---|---|---|
 | **Sistema de Pagos** | External Software System | Procesamiento de pagos y facturas (Stripe / MercadoPago). Recibe solicitudes de cobro y responde vía webhook. |
 | **Sistema de Envios** | External Software System | Entrega y seguimiento logístico de los pedidos. Recibe datos del envío y notifica actualizaciones de estado. |
-| **Proveedores de perfumes** | External Software System | Proveedores/distribuidores de los productos del catálogo. Reciben pedidos de restock vía REST/HTTPS cuando el stock está bajo. |
+| **Sistema de Proveeduría** | External Software System | Proveedores/distribuidores de los productos del catálogo. Reciben pedidos de restock vía REST/HTTPS cuando el stock está bajo. Notifican al Servicio Catálogo vía webhook cuando despachan la reposición. |
 
 ---
 
@@ -64,7 +64,8 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 
 - Recibe requests desde el API Gateway.
 - Se comunica con el Servicio Carrito solo cuando el actor es un Comprador realizando una compra.
-- Manda mensajes de restock a los Proveedores de perfumes vía REST/HTTPS.
+- Manda mensajes de restock al Sistema de Proveeduría vía REST/HTTPS.
+- Recibe notificaciones de reposición del Sistema de Proveeduría vía webhook y actualiza `Producto.stock`.
 
 ---
 
@@ -73,25 +74,17 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 **Responsabilidad:** Funcionalidad de pedidos, pagos y notificaciones.
 
 - Recibe requests del Servicio Catálogo.
-- Lee y escribe en Fragance DB y en Envios DB.
+- Lee y escribe en Fragance DB.
 - Se comunica con el Sistema de Pagos.
+- Se comunica con el Sistema de Envios para despachar pedidos y recibir actualizaciones de estado.
 
 ---
 
 ### 6. Fragance DB `[Container: SQL]`
 
-**Responsabilidad:** Base de datos principal con toda la información del marketplace, incluyendo usuarios.
+**Responsabilidad:** Base de datos principal y única del sistema. Contiene toda la información del marketplace: usuarios, productos, carritos, pagos, facturas y estado de envíos.
 
-- Accedida por API Gateway y Servicio Carrito.
-
----
-
-### 7. Envios DB `[Container: SQL]`
-
-**Responsabilidad:** Historial de pedidos, estado de los envíos, con sus respectivos usuarios.
-
-- Escrita por el Servicio Carrito.
-- Se conecta con el Sistema de Envios.
+- Accedida por API Gateway, Servicio Catálogo y Servicio Carrito.
 
 ---
 
@@ -103,7 +96,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 Comprador → Web App → API Gateway → Servicio Catálogo → Servicio Carrito
                                                           → Fragance DB
                                                           → Sistema de Pagos → Notificación → Comprador
-                                                          → Envios DB → Sistema de Envios → Notificación → Comprador
+                                                          → Sistema de Envios → Notificación → Comprador
 ```
 
 ### Flujo de catálogo y búsqueda
@@ -115,7 +108,8 @@ Comprador → Web App → API Gateway → Servicio Catálogo
 ### Flujo de restock
 
 ```
-Servicio Catálogo → Proveedores de perfumes (REST/HTTPS)
+Servicio Catálogo → Sistema de Proveeduría (REST/HTTPS — pedido de restock)
+Sistema de Proveeduría → Servicio Catálogo (webhook — notificación de reposición → actualiza Producto.stock)
 ```
 
 ### Flujo de gestión de inventario (Vendedor)

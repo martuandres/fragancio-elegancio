@@ -55,6 +55,8 @@ Es la fuente de verdad conceptual de la estructura de datos.
 | `notas_corazon` | Notas de corazón (heart notes)                  |
 | `notas_fondo`   | Notas de fondo (base notes)                     |
 
+> **Nota sobre imagen:** `imagen_url` no aparece en este modelo porque el E-R es conceptual y describe reglas de dominio, no detalles de implementación técnica. Una URL a un archivo externo es un detalle de presentación, no una entidad del negocio. `imagen_url` sí aparece en el modelado de datos (`modelado-datos.md`) y en el schema Prisma, que operan al nivel lógico/físico donde las columnas concretas importan.
+
 ### Variante_Producto
 | Atributo              | Descripción                              |
 |-----------------------|------------------------------------------|
@@ -131,7 +133,7 @@ Es la fuente de verdad conceptual de la estructura de datos.
 Usuario ──EsUn──► Vendedor
         └─EsUn──► Comprador
 
-Proveedor ──0..*── ofrece ──1..*──► Producto ◄──1..*── tiene ──1── Variante_Producto
+Proveedor ──0..*── ofrece ──1..*──► Producto ◄──1..*── tiene ──1..*── Variante_Producto
                                         ▲
                     Categoria ──1..*── pertenece ──0..*──┘
 
