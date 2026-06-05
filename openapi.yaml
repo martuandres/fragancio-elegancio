@@ -276,20 +276,20 @@ paths:
 
   /checkout:
     post:
-      summary: Confirmar compra y crear orden desde el carrito activo
+      summary: Confirmar compra y crear Pago desde el carrito activo
       tags: [Checkout]
       security:
         - bearerAuth: []
       description: |
-        Crea una `OrdenCompra` a partir del carrito activo del comprador.
+        Crea un `Pago` con estado `pendiente` a partir del carrito activo del comprador.
 
-        **Atomicidad:** El stock se valida y decrementa dentro de una única transacción
+        **Atomicidad:** El stock se valida y reserva dentro de una única transacción
         de base de datos (`prisma.$transaction`) para prevenir sobreventa bajo concurrencia.
 
-        **Reserva:** La orden queda en estado `pendiente` durante 5 minutos.
-        Si el pago no se confirma en ese tiempo, el stock puede liberarse manualmente.
+        **Reserva:** El `Pago` queda en estado `pendiente` durante 5 minutos.
+        Si el pago no se confirma en ese tiempo, el stock reservado se libera automáticamente.
 
-        **Pago:** El pago se confirma via webhook en `POST /pagos/webhook`.
+        **Pago:** El resultado del pago llega vía webhook en `POST /pagos/webhook`.
       requestBody:
         required: false
         content:
@@ -305,7 +305,7 @@ paths:
                   example: Av. Corrientes 1234, Buenos Aires
       responses:
         '201':
-          description: Orden creada exitosamente
+          description: Pago pendiente creado exitosamente
           headers:
             Location:
               description: URL del recurso creado
@@ -317,7 +317,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  id_pedido:
+                  id_carrito:
                     type: integer
                     example: 7
                   importe_total:
@@ -420,7 +420,7 @@ paths:
         - in: path
           name: id
           required: true
-          description: ID de la orden de compra
+          description: ID del carrito (pedido)
           schema:
             type: integer
           example: 7
@@ -455,7 +455,7 @@ paths:
                   message: No existe un pedido con id 7.
 
     patch:
-      summary: Actualizar estado de una orden (solo vendedores)
+      summary: Actualizar estado de envío de una orden (solo vendedores)
       tags: [Pedidos]
       security:
         - bearerAuth: []
@@ -463,6 +463,7 @@ paths:
         - in: path
           name: id
           required: true
+          description: ID del carrito (pedido)
           schema:
             type: integer
           example: 7
@@ -476,9 +477,9 @@ paths:
               properties:
                 estado:
                   type: string
-                  enum: [enviado, entregado, cancelado]
-                  description: Nuevo estado de la orden
-                  example: enviado
+                  enum: [en_transito, entregado, cancelado]
+                  description: Nuevo estado del envío asociado a la orden
+                  example: en_transito
       responses:
         '200':
           description: Estado actualizado exitosamente
@@ -487,15 +488,12 @@ paths:
               schema:
                 type: object
                 properties:
-                  id_pedido:
+                  id_carrito:
                     type: integer
                     example: 7
                   estado:
                     type: string
-                    example: enviado
-                  enviado:
-                    type: boolean
-                    example: true
+                    example: en_transito
         '400':
           description: Estado inválido
           content:
@@ -505,7 +503,7 @@ paths:
               example:
                 error:
                   code: ESTADO_INVALIDO
-                  message: "El estado debe ser uno de: enviado, entregado, cancelado."
+                  message: "El estado debe ser uno de: en_transito, entregado, cancelado."
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -525,7 +523,7 @@ paths:
       tags: [Inventario]
       security:
         - bearerAuth: []
-      description: Devuelve solo los productos asociados al vendedor autenticado via `ProveedorProducto`.
+      description: Devuelve los productos del inventario del vendedor autenticado.
       parameters:
         - in: query
           name: page
@@ -561,7 +559,7 @@ paths:
       security:
         - bearerAuth: []
       description: >
-        Crea el producto y lo asocia al vendedor via `ProveedorProducto`.
+        Crea el producto en el inventario del vendedor.
         El par (nombre, marca) debe ser único en el sistema.
       requestBody:
         required: true
@@ -665,8 +663,8 @@ paths:
         '404':
           $ref: '#/components/responses/ProductoNoEncontrado'
 
-    put:
-      summary: Actualizar un producto del inventario (reemplazo parcial)
+    patch:
+      summary: Actualizar parcialmente un producto del inventario
       tags: [Inventario]
       security:
         - bearerAuth: []
@@ -716,8 +714,8 @@ paths:
       security:
         - bearerAuth: []
       description: >
-        Elimina el vínculo `ProveedorProducto` entre el vendedor y el producto.
-        El producto en sí no se borra del sistema (puede tener otros vendedores o historial de pedidos).
+        Elimina el producto del inventario del vendedor.
+        El producto en sí no se borra del sistema si tiene historial de pedidos.
       parameters:
         - in: path
           name: id
@@ -753,7 +751,7 @@ paths:
         | notas_corazon  | 40%  |
         | notas_salida   | 30%  |
         | notas_fondo    | 20%  |
-        | ingredientes   | 10%  |
+        | ingrediente    | 10%  |
 
         Solo incluye productos con stock > 0, ordenados de mayor a menor similitud.
       parameters:
@@ -825,12 +823,12 @@ paths:
       security:
         - bearerAuth: []
       description: >
-        El `{id}` es el **id_pedido** (ID de la orden), no el id_envio interno.
+        El `{id}` es el **id_carrito** (ID del carrito/pedido), no el id_envio interno.
         Compradores solo pueden ver el envío de sus propios pedidos.
       parameters:
         - in: path
           name: id
-          description: ID de la orden de compra
+          description: ID del carrito (pedido)
           required: true
           schema:
             type: integer
@@ -869,7 +867,7 @@ paths:
       parameters:
         - in: path
           name: id
-          description: ID de la orden de compra
+          description: ID del carrito (pedido)
           required: true
           schema:
             type: integer
@@ -883,9 +881,9 @@ paths:
               properties:
                 estado:
                   type: string
-                  enum: [preparando, en_camino, entregado]
+                  enum: [preparando, en_transito, entregado]
                   description: Nuevo estado del envío
-                  example: en_camino
+                  example: en_transito
                 track_code:
                   type: string
                   description: Código de seguimiento del transportista
@@ -906,7 +904,7 @@ paths:
               example:
                 error:
                   code: ESTADO_INVALIDO
-                  message: "El estado del envío debe ser uno de: preparando, en_camino, entregado."
+                  message: "El estado del envío debe ser uno de: preparando, en_transito, entregado."
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -937,9 +935,8 @@ paths:
 
         **Flujo al aprobarse el pago:**
         1. `Pago.estado` → `aprobado`
-        2. `OrdenCompra.estado` → `aprobado`
-        3. Se crea la `Factura` correspondiente
-        4. Se crea el registro `Envio` con `estado = preparando`
+        2. Se crea la `Factura` correspondiente
+        3. Se crea el registro `Envio` con `estado = preparando`
       parameters:
         - in: header
           name: X-Webhook-Signature
@@ -953,11 +950,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [id_pedido, estado]
+              required: [id_carrito, estado]
               properties:
-                id_pedido:
+                id_carrito:
                   type: integer
-                  description: ID interno de la orden de compra
+                  description: ID interno del carrito asociado al pago
                   example: 7
                 estado:
                   type: string
@@ -1000,7 +997,7 @@ paths:
                   code: FIRMA_INVALIDA
                   message: La firma del webhook es inválida o ausente.
         '404':
-          description: Orden no encontrada
+          description: Carrito no encontrado
           content:
             application/json:
               schema:
@@ -1268,7 +1265,9 @@ components:
 
     Producto:
       type: object
-      description: Producto del catálogo público
+      description: >
+        Producto del catálogo público. Los campos `precio` y `concentracion` corresponden
+        a la variante principal del producto (vista aplanada para el catálogo).
       properties:
         id_producto:
           type: integer
@@ -1282,6 +1281,7 @@ components:
         precio:
           type: number
           format: float
+          description: Precio de la variante principal
           example: 45000.00
         stock:
           type: integer
@@ -1289,6 +1289,7 @@ components:
         concentracion:
           type: string
           nullable: true
+          description: Concentración de la variante principal (EDT, EDP, Parfum, etc.)
           example: Eau de Parfum
         imagen_url:
           type: string
@@ -1319,8 +1320,9 @@ components:
                 properties:
                   id_categoria:
                     type: integer
-                  nombre:
+                  criterio:
                     type: string
+                    nullable: true
                     example: Amaderado
         variantes:
           type: array
@@ -1332,7 +1334,7 @@ components:
         - $ref: '#/components/schemas/Producto'
         - type: object
           properties:
-            ingredientes:
+            ingrediente:
               type: string
               nullable: true
               description: Lista de ingredientes INCI del perfume
@@ -1397,7 +1399,7 @@ components:
           type: string
           nullable: true
           example: Eau de Parfum
-        ingredientes:
+        ingrediente:
           type: string
           nullable: true
           example: "Alcohol Denat., Aqua, Fragrance"
@@ -1420,7 +1422,7 @@ components:
 
     Variante:
       type: object
-      description: Variante de un producto por volumen y precio diferente
+      description: Variante de un producto por volumen y concentración
       properties:
         id_variante_producto:
           type: integer
@@ -1430,13 +1432,15 @@ components:
           format: float
           description: Volumen en ml
           example: 50.0
+        concentracion:
+          type: string
+          nullable: true
+          description: Tipo de concentración (EDT, EDP, Parfum, etc.)
+          example: Eau de Parfum
         precio:
           type: number
           format: float
           example: 35000.00
-        stock:
-          type: integer
-          example: 8
 
     CarritoDetalle:
       type: object
@@ -1447,6 +1451,10 @@ components:
           nullable: true
           description: null si el usuario no tiene carrito activo todavía
           example: 7
+        estado:
+          type: string
+          description: Estado del carrito (activo | checkout | cerrado)
+          example: activo
         fecha_creada:
           type: string
           format: date-time
@@ -1492,7 +1500,7 @@ components:
       type: object
       description: Resumen de una orden de compra para el listado
       properties:
-        id_pedido:
+        id_carrito:
           type: integer
           example: 7
         fecha_creada:
@@ -1501,15 +1509,14 @@ components:
           example: '2026-06-03T10:00:00.000Z'
         estado:
           type: string
-          description: Estado de la orden — pendiente | aprobado | enviado | entregado | cancelado
+          description: >
+            Estado derivado que combina Pago.estado (pendiente | aprobado | rechazado)
+            y Envio.estado (preparando | en_transito | entregado).
           example: pendiente
         importe_total:
           type: number
           format: float
           example: 45000.00
-        enviado:
-          type: boolean
-          example: false
         pago:
           type: object
           nullable: true
@@ -1519,9 +1526,6 @@ components:
             estado:
               type: string
               example: pendiente
-            total:
-              type: number
-              format: float
         envio:
           type: object
           nullable: true
@@ -1555,7 +1559,7 @@ components:
                   precio:
                     type: number
                     format: float
-                    description: Precio unitario al momento de la compra
+                    description: Precio unitario actual del producto (no es un snapshot histórico — CarritoProducto no almacena precio)
                   producto:
                     type: object
                     properties:
@@ -1572,14 +1576,8 @@ components:
               properties:
                 id_pago:
                   type: integer
-                total:
-                  type: number
-                  format: float
                 estado:
                   type: string
-                fecha_emision:
-                  type: string
-                  format: date-time
                 factura:
                   type: object
                   nullable: true
@@ -1605,7 +1603,7 @@ components:
           example: 3
         estado:
           type: string
-          enum: [preparando, en_camino, entregado]
+          enum: [preparando, en_transito, entregado]
           description: Estado actual del envío
           example: preparando
         track_code:
@@ -1613,6 +1611,3 @@ components:
           nullable: true
           description: Código de seguimiento del transportista
           example: OCA-2026-789456
-        direccion_envio:
-          type: string
-          example: Av. Corrientes 1234, Buenos Aires
