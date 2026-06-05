@@ -26,17 +26,22 @@ Provee el contenido estático de la página.
 
 Enrutamiento y autenticación.
 
-### 3. Servicio Catálogo
+### 3. Servicio Usuarios
+`[Container: Clerk]`
+
+Gestión de identidad, sesiones y roles de usuario.
+
+### 4. Servicio Catálogo
 `[Node.js]`
 
 Gestión de productos, búsqueda y filtros.
 
-### 4. Lógica de Negocio
+### 5. Lógica de Negocio
 `[Container: Javascript y Node.js]`
 
 Provee la funcionalidad de carrito, pedidos, pagos y notificaciones.
 
-### 5. Fragance DB
+### 6. Fragance DB
 `[Container: SQL]`
 
 Base de datos con toda la información de usuarios, envíos y fragancias.
@@ -48,18 +53,27 @@ Base de datos con toda la información de usuarios, envíos y fragancias.
 ### Dentro de Web App
 
 #### Sign In Controller
-`[Component: Next.js API Route]`
+`[Component: Next.js Page]`
 
-Gestiona el registro, inicio de sesión y validación de roles (comprador/vendedor).
+Maneja las páginas de login y registro del lado del cliente. Interactúa con Clerk para autenticar al usuario.
 
 ---
 
 ### Dentro de API Gateway
 
 #### Controlador Autorización
-`[Component: Next.js API Route]`
+`[Component: Next.js Middleware]`
 
-Gestiona el registro, inicio de sesión y validación de roles (comprador/vendedor).
+Valida el JWT de Clerk y verifica el rol (comprador/vendedor) en cada endpoint sensible del API.
+
+---
+
+### Dentro de Servicio Usuarios
+
+#### Autenticación y Roles
+`[Component: Clerk]`
+
+Gestiona perfiles de usuario, sesiones y asignación de roles (comprador/vendedor) mediante JWT.
 
 ---
 
@@ -70,8 +84,6 @@ Gestiona el registro, inicio de sesión y validación de roles (comprador/vended
 | **Controlador Catálogo** | Next.js API Route | Maneja las peticiones para navegar categorías y buscar productos |
 | **Gestionar Inventario** | Node.js | Permite al vendedor dar de alta, baja o modificar productos ya existentes |
 | **Servicio Stock REGULAR** | Node.js | Manejo de stock regular de productos |
-| **Historial de Pedidos** | Node.js | Muestra todas las órdenes hechas por el usuario, si es que posee alguna |
-| **Servicio de Entrega de Pedidos** | Node.js | Gestiona la entrega de pedidos |
 | **Motor Recomendación** | Node.js | Calcula recomendaciones basadas en ingredientes y notas de salida, corazón y fondo |
 
 ---
@@ -81,10 +93,12 @@ Gestiona el registro, inicio de sesión y validación de roles (comprador/vended
 | Componente | Tecnología | Descripción |
 |---|---|---|
 | **Servicio Carrito** | Node.js | Guarda los productos y sus valores respectivos |
-| **Servicio Stock ATOMICIDAD** | Node.js | Responsable de la validación atómica. Asegura que no se vendan productos sin stock real y maneja la reserva temporal de 5 min. |
-| **Controlador Checkout** | Next.js API Route | Recibe la intención de compra y transforma el carrito en una orden |
+| **Controlador Checkout** | Next.js API Route | Punto de entrada de la compra: valida el carrito, invoca la reserva de stock y redirige al sistema de pagos |
+| **Servicio Stock ATOMICIDAD** | Node.js | Responsable de la validación atómica. Asegura que no se vendan productos sin stock real y maneja la reserva dentro de una transacción de base de datos. |
 | **Servicio Notificación** | Node.js | Gestiona el envío de correos automáticos de forma asincrónica (si falla, la compra sigue adelante) |
 | **Servicio Envio** | Node.js | Mantiene la lógica de seguimiento de estado y entrega de órdenes de compra |
+| **Historial de Pedidos** | Node.js | Muestra todas las órdenes hechas por el usuario, si es que posee alguna |
+| **Servicio de Entrega de Pedidos** | Node.js | Gestiona la comunicación con el Sistema de Envíos para despachar y actualizar el estado de los pedidos |
 
 ---
 
@@ -93,36 +107,37 @@ Gestiona el registro, inicio de sesión y validación de roles (comprador/vended
 ```
 Web App
   └──► Sign In Controller
+         └──► Servicio Usuarios [Clerk]
 
 API Gateway
   └──► Controlador Autorización
-
-Fragance DB
-  └──► Controlador Autorización
+         └──► Servicio Usuarios [Clerk]
 
 Servicio Catálogo
   ├──► Controlador Catálogo
   │       └──► Motor Recomendación
   ├──► Gestionar Inventario
-  ├──► Historial de Pedidos
-  │       └──► Fragance DB
-  ├──► Servicio de Entrega de Pedidos
   │       └──► Fragance DB
   └──► Servicio Stock REGULAR
          └──► Proveedores de perfumes
 
 Lógica de Negocio
-  └──► Servicio Carrito
-         └──► Servicio Stock ATOMICIDAD
-                └──► Servicio Notificación
-                       └──► Sistema de Pagos
-                              └──► Controlador Checkout
-                                     └──► Servicio Envio
-                                            └──► Sistema de Envios
-                                                   └──► Servicio de Entrega de Pedidos
+  ├──► Servicio Carrito
+  │       └──► Fragance DB
+  ├──► Controlador Checkout
+  │       ├──► Servicio Stock ATOMICIDAD
+  │       │       └──► Fragance DB
+  │       └──► Sistema de Pagos
+  │              ├──► Servicio Notificación  (async — fire-and-forget)
+  │              └──► Servicio Envio
+  │                     └──► Sistema de Envios
+  ├──► Historial de Pedidos
+  │       └──► Fragance DB
+  └──► Servicio de Entrega de Pedidos
+         └──► Sistema de Envios
 
 Sistema de Envios
-  └──► Servicio de Entrega de Pedidos
+  └──► Servicio de Entrega de Pedidos  (notificación de actualización de estado)
 ```
 
 ---
@@ -132,6 +147,8 @@ Sistema de Envios
 | Tecnología | Usada en |
 |---|---|
 | React | Web App |
+| Clerk | Servicio Usuarios |
 | Node.js | API Gateway, Servicio Catálogo, Lógica de Negocio, y la mayoría de los componentes internos |
-| Next.js API Route | Controlador Catálogo, Controlador Checkout, Controlador Autorización, Sign In Controller |
+| Next.js API Route | Controlador Catálogo, Controlador Checkout, Controlador Autorización |
+| Next.js Page | Sign In Controller |
 | SQL | Fragance DB |

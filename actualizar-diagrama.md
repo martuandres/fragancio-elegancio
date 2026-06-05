@@ -212,3 +212,21 @@ Este archivo registra todas las modificaciones realizadas a los documentos de ar
 | # | Sección | Cambio |
 |---|---|---|
 | 71 | Sistemas externos — nombre | `Proveedores de perfumes` → `Sistema de Proveeduría`. El nombre era inconsistente: el propio C4 usaba "Sistema de Proveeduría" en el cuerpo del Servicio Catálogo, y todos los demás documentos (DFD, casos de uso) usan ese nombre. Unificado en las tres ocurrencias del C4: tabla de sistemas externos, responsabilidades del Servicio Catálogo y flujo de restock. |
+
+---
+
+## 2026-06-05
+
+### docs/diagrama_componentes_API.md
+
+| # | Sección | Cambio |
+|---|---|---|
+| 72 | Contenedores | Agregado contenedor **Servicio Usuarios `[Clerk]`** con descripción "Gestión de identidad, sesiones y roles de usuario". Estaba presente en el diagrama de contenedores C4 pero ausente en el de componentes. |
+| 73 | Componentes — Servicio Usuarios | Agregado componente interno **Autenticación y Roles `[Clerk]`**: "Gestiona perfiles de usuario, sesiones y asignación de roles (comprador/vendedor) mediante JWT." |
+| 74 | Componentes — Web App — Sign In Controller | Tecnología corregida: `Next.js API Route` → `Next.js Page`. Descripción diferenciada: antes era idéntica a la de Controlador Autorización. Nueva descripción: "Maneja las páginas de login y registro del lado del cliente. Interactúa con Clerk para autenticar al usuario." |
+| 75 | Componentes — API Gateway — Controlador Autorización | Tecnología corregida: `Next.js API Route` → `Next.js Middleware`. Descripción diferenciada: "Valida el JWT de Clerk y verifica el rol (comprador/vendedor) en cada endpoint sensible del API." |
+| 76 | Componentes — Servicio Catálogo | Eliminados **Historial de Pedidos** y **Servicio de Entrega de Pedidos**. Ninguno tiene relación con la gestión de productos o búsqueda. |
+| 77 | Componentes — Lógica de Negocio | Incorporados **Historial de Pedidos** y **Servicio de Entrega de Pedidos** (movidos desde Servicio Catálogo). Actualizada descripción de Servicio de Entrega de Pedidos para distinguirla de Servicio Envio: "Gestiona la comunicación con el Sistema de Envíos para despachar y actualizar el estado de los pedidos." |
+| 78 | Relaciones — Lógica de Negocio | Cadena de relaciones reescrita. El Controlador Checkout pasa a ser el punto de entrada; Servicio Stock ATOMICIDAD es invocado por Checkout (no al revés); Sistema de Pagos confirma vía webhook disparando Servicio Notificación (async) y Servicio Envio. Historial de Pedidos e Historial de Entrega pasan a relacionarse con Fragance DB y Sistema de Envios respectivamente, como nodos independientes bajo Lógica de Negocio. |
+| 79 | Relaciones — Servicio de Entrega de Pedidos duplicado | Eliminada la aparición duplicada. El componente ahora vive solo en Lógica de Negocio. La relación `Sistema de Envios → Servicio de Entrega de Pedidos` se mantiene como relación de retorno (notificación de actualización de estado). |
+| 80 | Resumen de Tecnologías | Agregadas tecnologías Clerk y Next.js Page. Sign In Controller pasó de "Next.js API Route" a "Next.js Page". |
