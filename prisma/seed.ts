@@ -14,7 +14,6 @@ type PerfumAPIItem = {
   description?: string;
   gender?: string;
   image_url?: string;
-  rating?: number | string;
 };
 
 async function main() {
@@ -28,36 +27,52 @@ async function main() {
 
   console.log(`Got ${perfumes.length} perfumes. Upserting...`);
 
-  let created = 0;
-  let updated = 0;
-
   for (const p of perfumes) {
     const nombre = p.name?.trim();
     const marca  = p.brand?.trim();
     if (!nombre || !marca) continue;
 
-    const payload = {
+    const productoPayload = {
       nombre,
       marca,
-      precio:        50000,
       stock:         10,
-      concentracion: p.gender?.trim() || null,
-      ingredientes:  p.description?.trim() || null,
+      ingrediente:   p.description?.trim() || null,
       imagen_url:    p.image_url?.trim() || null,
       notas_salida:  p.notes_top?.join(", ")    || null,
       notas_corazon: p.notes_middle?.join(", ") || null,
       notas_fondo:   p.notes_base?.join(", ")   || null,
     };
 
-    const result = await prisma.producto.upsert({
+    const producto = await prisma.producto.upsert({
       where:  { nombre_marca: { nombre, marca } },
-      create: payload,
-      update: payload,
+      create: productoPayload,
+      update: productoPayload,
+      select: { id_producto: true },
     });
 
-    // upsert no distingue create/update, contamos por id
-    if (result.id_producto > 0) created++;
-    else updated++;
+    // Crear variante con precio/concentración por defecto si no tiene ninguna
+    const yaTieneVariante = await prisma.productoVarianteProducto.findFirst({
+      where: { id_producto: producto.id_producto },
+    });
+
+    if (!yaTieneVariante) {
+      const variante = await prisma.varianteProducto.create({
+        data: {
+          volumen:       50,
+          precio:        50000,
+          concentracion: p.gender?.trim() || null,
+        },
+        select: { id_variante_producto: true },
+      });
+
+      await prisma.productoVarianteProducto.create({
+        data: {
+          id_producto:          producto.id_producto,
+          id_variante_producto: variante.id_variante_producto,
+          ranking:              1,
+        },
+      });
+    }
   }
 
   console.log(`Done. ${perfumes.length} productos procesados.`);
