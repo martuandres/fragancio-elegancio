@@ -67,7 +67,7 @@ paths:
 
   # ── CATÁLOGO ────────────────────────────────────────────────────────────────
 
-  /catalogo:
+  /catalogos:
     get:
       summary: Listar productos disponibles
       tags: [Catálogo]
@@ -139,10 +139,12 @@ paths:
                   limit: 20
                   total: 1
                   totalPages: 1
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── CARRITO ─────────────────────────────────────────────────────────────────
 
-  /carrito:
+  /carritos:
     get:
       summary: Obtener el carrito activo del comprador
       tags: [Carrito]
@@ -157,6 +159,8 @@ paths:
                 $ref: '#/components/schemas/CarritoDetalle'
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     post:
       summary: Agregar o actualizar un ítem en el carrito
@@ -226,7 +230,7 @@ paths:
                 error:
                   code: PRODUCTO_NO_ENCONTRADO
                   message: No existe un producto con id 42.
-        '409':
+        '422':
           description: Stock insuficiente para la cantidad solicitada
           content:
             application/json:
@@ -237,6 +241,8 @@ paths:
                   code: STOCK_INSUFICIENTE
                   message: No hay suficiente stock disponible para la cantidad solicitada.
                   details: "Stock disponible: 3, solicitado: 10"
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     delete:
       summary: Quitar un ítem del carrito
@@ -268,6 +274,8 @@ paths:
                 error:
                   code: CARRITO_NO_ENCONTRADO
                   message: No existe un carrito activo para este usuario.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── CHECKOUT ────────────────────────────────────────────────────────────────
 
@@ -356,8 +364,8 @@ paths:
                 error:
                   code: ACCESO_DENEGADO
                   message: Solo los compradores pueden realizar el proceso de compra.
-        '409':
-          description: Stock insuficiente para algún producto durante la transacción
+        '422':
+          description: Stock insuficiente para algún producto durante la transacción atómica
           content:
             application/json:
               schema:
@@ -366,6 +374,8 @@ paths:
                 error:
                   code: CHECKOUT_FALLIDO
                   message: "Stock insuficiente para \"Bleu de Chanel\": disponible 1, solicitado 2"
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── PEDIDOS ─────────────────────────────────────────────────────────────────
 
@@ -403,6 +413,8 @@ paths:
                     $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   /pedidos/{id}:
     get:
@@ -450,6 +462,8 @@ paths:
                 error:
                   code: PEDIDO_NO_ENCONTRADO
                   message: No existe un pedido con id 7.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     patch:
       summary: Actualizar estado de envío de una orden (solo vendedores)
@@ -511,10 +525,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/PedidoNoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── INVENTARIO ──────────────────────────────────────────────────────────────
 
-  /inventario:
+  /inventarios:
     get:
       summary: Listar productos del inventario del vendedor
       tags: [Inventario]
@@ -549,6 +565,8 @@ paths:
                     $ref: '#/components/schemas/Pagination'
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     post:
       summary: Crear un nuevo producto en el inventario
@@ -580,7 +598,7 @@ paths:
             Location:
               schema:
                 type: string
-              example: /api/inventario/42
+              example: /api/inventarios/42
           content:
             application/json:
               schema:
@@ -624,8 +642,10 @@ paths:
                 error:
                   code: PRODUCTO_DUPLICADO
                   message: Ya existe un producto con ese nombre y marca.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
-  /inventario/{id}:
+  /inventarios/{id}:
     get:
       summary: Obtener un producto del inventario propio
       tags: [Inventario]
@@ -659,6 +679,8 @@ paths:
                   message: Este producto no pertenece a tu inventario.
         '404':
           $ref: '#/components/responses/ProductoNoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     patch:
       summary: Actualizar parcialmente un producto del inventario
@@ -704,6 +726,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     delete:
       summary: Desvincular un producto del inventario del vendedor
@@ -732,6 +756,8 @@ paths:
                 $ref: '#/components/schemas/Error'
         '404':
           $ref: '#/components/responses/ProductoNoEncontrado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── RECOMENDACIONES ─────────────────────────────────────────────────────────
 
@@ -810,6 +836,8 @@ paths:
                 error:
                   code: PRODUCTO_NO_ENCONTRADO
                   message: No existe un producto con id 5.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── ENVÍOS ──────────────────────────────────────────────────────────────────
 
@@ -855,6 +883,8 @@ paths:
                 error:
                   code: ENVIO_NO_ENCONTRADO
                   message: No existe un envío asociado a la orden 7.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
     patch:
       summary: Actualizar estado o código de seguimiento del envío (solo vendedores)
@@ -916,6 +946,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── PAGOS ───────────────────────────────────────────────────────────────────
 
@@ -1009,6 +1041,8 @@ paths:
                 error:
                   code: PAGO_YA_PROCESADO
                   message: Este pago ya fue confirmado anteriormente.
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   # ── AUTH ────────────────────────────────────────────────────────────────────
 
@@ -1057,6 +1091,8 @@ paths:
                   message: "El rol debe ser 'comprador' o 'vendedor'."
         '401':
           $ref: '#/components/responses/NoAutenticado'
+        '500':
+          $ref: '#/components/responses/ErrorInterno'
 
   /auth/webhook:
     post:
@@ -1210,6 +1246,17 @@ components:
             error:
               code: PEDIDO_NO_ENCONTRADO
               message: No existe un pedido con id 7.
+
+    ErrorInterno:
+      description: Error interno del servidor
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: ERROR_INTERNO
+              message: Ocurrió un error interno. Por favor reintentá más tarde.
 
   # ── Schemas ──────────────────────────────────────────────────────────────────
 
