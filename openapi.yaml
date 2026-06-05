@@ -243,17 +243,14 @@ paths:
       tags: [Carrito]
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [id_producto]
-              properties:
-                id_producto:
-                  type: integer
-                  example: 42
+      parameters:
+        - in: query
+          name: id_producto
+          required: true
+          description: ID del producto a quitar del carrito
+          schema:
+            type: integer
+          example: 42
       responses:
         '204':
           description: Ítem eliminado. Sin body.
@@ -1169,7 +1166,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT emitido por Clerk. Incluirlo en el header → `Authorization: Bearer <token>`
+      description: JWT emitido por Clerk. Incluirlo en el header → `Authorization Bearer <token>`
 
   # ── Respuestas reutilizables ─────────────────────────────────────────────────
 
