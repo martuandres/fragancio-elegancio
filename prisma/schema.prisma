@@ -51,7 +51,7 @@ model Producto {
   notas_salida  String?
   notas_corazon String?
   notas_fondo   String?
-  variantes     VarianteProducto[]
+  variante      ProductoVarianteProducto[]
   categorias    ProductoCategoria[]
   proveedores   ProveedorProducto[]
   carritoItems  CarritoProducto[]
@@ -60,12 +60,21 @@ model Producto {
 }
 
 model VarianteProducto {
-  id_variante_producto Int      @id @default(autoincrement())
-  id_producto          Int
+  id_variante_producto Int                        @id @default(autoincrement())
   volumen              Decimal
   precio               Decimal
   concentracion        String?
-  producto             Producto @relation(fields: [id_producto], references: [id_producto])
+  productos            ProductoVarianteProducto[]
+}
+
+model ProductoVarianteProducto {
+  id_variante_producto Int
+  id_producto          Int
+  ranking              Int?
+  variante             VarianteProducto @relation(fields: [id_variante_producto], references: [id_variante_producto])
+  producto             Producto         @relation(fields: [id_producto], references: [id_producto])
+
+  @@id([id_variante_producto, id_producto])
 }
 
 model Categoria {
