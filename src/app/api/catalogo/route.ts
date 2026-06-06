@@ -50,12 +50,7 @@ export async function GET(req: NextRequest) {
         },
         variante: {
           orderBy: { ranking: "asc" as const },
-          select: {
-            ranking: true,
-            variante: {
-              select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true },
-            },
-          },
+          select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true, ranking: true },
         },
       },
       orderBy: { id_producto: "asc" },
@@ -73,11 +68,10 @@ export async function GET(req: NextRequest) {
     notas_corazon: p.notas_corazon,
     notas_fondo: p.notas_fondo,
     categorias: p.categorias.map((c) => c.categoria),
-    variantes: p.variante.map((pv) => ({
-      ranking: pv.ranking,
-      ...pv.variante,
-      precio: Number(pv.variante.precio),
-      volumen: Number(pv.variante.volumen),
+    variantes: p.variante.map((v) => ({
+      ...v,
+      precio: Number(v.precio),
+      volumen: Number(v.volumen),
     })),
   }));
 

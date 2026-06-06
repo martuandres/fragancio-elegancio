@@ -30,16 +30,12 @@ const SELECT = {
   variante: {
     take: 1,
     orderBy: { ranking: "asc" as const },
-    select: {
-      variante: {
-        select: { precio: true, concentracion: true },
-      },
-    },
+    select: { precio: true, concentracion: true },
   },
 } as const;
 
 function toProductoBase(p: Prisma.ProductoGetPayload<{ select: typeof SELECT }>): ProductoBase {
-  const v = p.variante[0]?.variante;
+  const v = p.variante[0];
   return {
     id_producto: p.id_producto,
     nombre: p.nombre,
@@ -83,8 +79,8 @@ async function getFilteredProductos(q?: string, categoria?: string, genero?: str
           { notas_fondo:   { contains: kw, mode: "insensitive" as const } },
         ]),
       }] : []),
-      ...(genero        ? [{ variante: { some: { variante: { concentracion: { contains: genero,        mode: "insensitive" as const } } } } }] : []),
-      ...(concentracion ? [{ variante: { some: { variante: { concentracion: { contains: concentracion, mode: "insensitive" as const } } } } }] : []),
+      ...(genero        ? [{ variante: { some: { concentracion: { contains: genero,        mode: "insensitive" as const } } } }] : []),
+      ...(concentracion ? [{ variante: { some: { concentracion: { contains: concentracion, mode: "insensitive" as const } } } }] : []),
     ],
   };
 

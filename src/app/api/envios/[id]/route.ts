@@ -17,10 +17,10 @@ async function resolveUsuario() {
 
   const comprador = await prisma.comprador.findFirst({
     where: { usuario: { email } },
-    select: { legajo: true },
+    select: { id_usuario: true },
   });
 
-  return { legajo: comprador?.legajo ?? null, role };
+  return { id_usuario: comprador?.id_usuario ?? null, role };
 }
 
 const ESTADOS_ENVIO = ["preparando", "en_camino", "entregado"] as const;
@@ -46,14 +46,14 @@ export async function GET(
       id_envio: true,
       estado: true,
       track_code: true,
-      carrito: { select: { legajo: true } },
+      carrito: { select: { id_usuario: true } },
     },
   });
 
   if (!envio)
     return apiError("ENVIO_NO_ENCONTRADO", `No existe un envío asociado al carrito ${id_carrito}.`, 404);
 
-  if (usuario.role === "comprador" && envio.carrito.legajo !== usuario.legajo)
+  if (usuario.role === "comprador" && envio.carrito.id_usuario !== usuario.id_usuario)
     return apiError("ACCESO_DENEGADO", "No tenés permiso para ver este envío.", 403);
 
   return Response.json({

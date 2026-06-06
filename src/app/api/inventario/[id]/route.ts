@@ -42,12 +42,7 @@ async function resolveProductoDelVendedor(legajo: string, id_producto: number) {
       notas_fondo: true,
       variante: {
         orderBy: { ranking: "asc" as const },
-        select: {
-          ranking: true,
-          variante: {
-            select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true },
-          },
-        },
+        select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true, ranking: true },
       },
     },
   });
@@ -76,17 +71,16 @@ export async function GET(
     return apiError("ACCESO_DENEGADO", "Este producto no pertenece a tu inventario.", 403);
   }
 
-  const v = producto.variante[0]?.variante;
+  const v = producto.variante[0];
   return Response.json({
     ...producto,
     variante: undefined,
     precio: Number(v?.precio ?? 0),
     concentracion: v?.concentracion ?? null,
     variantes: producto.variante.map((pv) => ({
-      ranking: pv.ranking,
-      ...pv.variante,
-      precio: Number(pv.variante.precio),
-      volumen: Number(pv.variante.volumen),
+      ...pv,
+      precio: Number(pv.precio),
+      volumen: Number(pv.volumen),
     })),
   });
 }

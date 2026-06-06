@@ -18,7 +18,7 @@ export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
           variante: {
             take: 1,
             orderBy: { ranking: "asc" as const },
-            select: { variante: { select: { precio: true } } },
+            select: { precio: true },
           },
         },
       });
@@ -35,7 +35,7 @@ export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
         data: { stock: { decrement: item.cantidad } },
       });
 
-      const precio = Number(producto.variante[0]?.variante?.precio ?? 0);
+      const precio = Number(producto.variante[0]?.precio ?? 0);
       importe_total += precio * item.cantidad;
     }
 

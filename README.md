@@ -1,6 +1,6 @@
-# Fragance Elegancio
+# Fragancio Elegancio
 ## Marketplace Especializado de Fragancias
-### Documento de Arquitectura y Especificaciones del Sistema — v1.0
+### Documento de Arquitectura y Especificaciones del Sistema — v1.1
 
 ---
 
@@ -13,15 +13,16 @@
 5. [Stack Tecnológico](#5-stack-tecnológico)
 6. [Flujos Principales del Sistema](#6-flujos-principales-del-sistema)
 7. [Estructura de Proyecto Next.js](#7-estructura-de-proyecto-nextjs)
-8. [Consideraciones de Seguridad y Arquitecturales](#8-consideraciones-de-seguridad-y-arquitecturales)
+8. [Setup y Comandos](#8-setup-y-comandos)
+9. [Consideraciones de Seguridad y Arquitecturales](#9-consideraciones-de-seguridad-y-arquitecturales)
 
 ---
 
 ## 1. Descripción General del Sistema
 
-Fragance Elegancio es un marketplace web especializado en la compra y venta de fragancias (perfumes). La plataforma conecta a dos tipos de usuarios: **compradores**, que exploran y adquieren productos, y **vendedores** (proveedores de perfumes), que gestionan su catálogo y stock.
+Fragancio Elegancio es un marketplace web especializado en la compra y venta de fragancias (perfumes). La plataforma conecta a dos tipos de usuarios: **compradores**, que exploran y adquieren productos, y **vendedores** (proveedores de perfumes), que gestionan su catálogo y stock.
 
-El sistema está diseñado con una arquitectura de microservicios orientada a la web, construida sobre Next.js en el frontend, Node.js en el backend, y una base de datos SQL gestionada con Prisma ORM.
+El sistema está diseñado con una arquitectura web full-stack construida sobre Next.js (App Router), con API Routes como backend y una base de datos SQL gestionada con Prisma ORM.
 
 ### 1.1 Objetivos del Sistema
 
@@ -66,11 +67,11 @@ Selección de productos → Pedido → Procesamiento de pago
 | Contenedor | Tecnología | Responsabilidad |
 |---|---|---|
 | Web App | React / Next.js | Provee el contenido estático de la página y la UI interactiva (catálogo, carrito, checkout, historial). |
-| API Gateway | Node.js | Enrutamiento centralizado y autenticación de todas las peticiones entre cliente y servicios backend. |
+| API Gateway | Next.js API Routes | Enrutamiento centralizado y autenticación de todas las peticiones entre cliente y servicios backend. |
 | Lógica de Negocio | Node.js | Funcionalidad central: carrito, pedidos, pagos y notificaciones. |
 | Servicio Catálogo | Node.js | Gestión de productos, búsqueda y filtros por categoría, marca, notas olfativas, etc. |
 | Servicio Usuarios | Clerk | Autenticación, registro, inicio de sesión y validación de roles (comprador / vendedor). |
-| Fragance DB | SQL (Prisma) | Base de datos relacional con toda la información de usuarios, envíos y fragancias. |
+| Fragancio DB | PostgreSQL (Prisma) | Base de datos relacional con toda la información de usuarios, envíos y fragancias. |
 | Sistema de Envíos | Externo | Entrega y seguimiento de los envíos. |
 | Sistema de Pagos | Externo | Procesamiento de pagos y facturas. |
 
@@ -96,7 +97,7 @@ Selección de productos → Pedido → Procesamiento de pago
 
 ## 3. Modelo de Datos
 
-La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQL. A continuación se detalla cada entidad con sus atributos y relaciones.
+La base de datos **Fragancio DB** está gestionada con Prisma ORM sobre PostgreSQL. A continuación se detalla cada entidad con sus atributos y relaciones.
 
 ### 3.1 Entidades
 
@@ -151,14 +152,16 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 
 #### Variante_Producto
 
+Relación **1:N** directa con Producto. Una variante pertenece a un único producto.
+
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_variante_producto` | INT — PK | Identificador único de la variante. |
-| `id_producto` | INT — FK | Producto al que pertenece (relación 1:N directa). |
+| `id_producto` | INT — FK | Producto al que pertenece (FK directa, relación 1:N). |
 | `volumen` | DECIMAL | Volumen en ml de la presentación. |
 | `precio` | DECIMAL | Precio específico de esta variante. |
 | `concentracion` | VARCHAR | Tipo de concentración (EDT, EDP, Parfum, Cologne, etc.). |
-| `ranking` | INT | Orden de la variante dentro del producto. |
+| `ranking` | INT | Orden de la variante dentro del producto (1 = principal). |
 
 #### Categoría
 
@@ -172,7 +175,7 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_carrito` | INT — PK | Identificador único del carrito. |
-| `id_usuario` | INT — FK | Comprador propietario (FK a Comprador.id_usuario). |
+| `id_usuario` | INT — FK | Comprador propietario (FK a `Comprador.id_usuario`). |
 | `fecha_creada` | DATETIME | Fecha y hora de creación. |
 | `estado` | ENUM | `activo` / `abandonado` / `convertido`. |
 
@@ -181,15 +184,15 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_pago` | INT — PK | Identificador único del pago. |
-| `id_carrito` | INT — FK UNIQUE | Carrito al que corresponde. |
+| `id_carrito` | INT — FK UNIQUE | Carrito al que corresponde (1:1 con Carrito). |
 | `estado` | ENUM | `pendiente` / `aprobado` / `rechazado` / `reembolsado`. |
 
 #### Factura
 
 | Atributo | Tipo | Descripción |
 |---|---|---|
-| `nro_factura` | VARCHAR — PK | Número único de factura. |
-| `id_pago` | INT — FK UNIQUE | Pago al que corresponde. |
+| `nro_factura` | VARCHAR — PK | Número único de factura (CUID). |
+| `id_pago` | INT — FK UNIQUE | Pago al que corresponde (1:1 con Pago). |
 | `fecha_emision` | DATETIME | Fecha de emisión del comprobante. |
 | `importe_total` | DECIMAL | Monto total facturado. |
 
@@ -198,29 +201,29 @@ La base de datos **Fragance DB** está gestionada con Prisma ORM sobre PostgreSQ
 | Atributo | Tipo | Descripción |
 |---|---|---|
 | `id_envio` | INT — PK | Identificador único del envío. |
-| `id_carrito` | INT — FK UNIQUE | Carrito al que pertenece. |
+| `id_carrito` | INT — FK UNIQUE | Carrito al que pertenece (1:1 con Carrito). |
 | `track_code` | VARCHAR | Código de seguimiento del sistema externo. |
-| `estado` | ENUM | `preparando` / `en tránsito` / `entregado` / `devuelto`. |
+| `estado` | ENUM | `preparando` / `en_camino` / `entregado`. |
 
 ### 3.2 Tablas de Relación (Junction Tables)
 
 | Tabla | Descripción |
 |---|---|
-| `Carrito_Producto` | Relaciona un Carrito con los Productos que contiene, incluyendo la `cantidad`. |
-| `Producto_Categoria` | Relación N:M entre Producto y Categoría. |
-| `Proveedor_Producto` | Relaciona Proveedores (por `marca`) con los Productos que suministran. |
+| `CarritoProducto` | Relaciona un Carrito con los Productos que contiene, incluyendo la `cantidad`. |
+| `ProductoCategoria` | Relación N:M entre Producto y Categoría. |
+| `ProveedorProducto` | Relaciona Proveedores (por `marca`) con los Productos que suministran. |
 
 ### 3.3 Relaciones entre Entidades
 
-- Un **Usuario** puede ser **Comprador** o **Vendedor** (herencia / EsUn).
+- Un **Usuario** puede ser **Comprador** o **Vendedor** (herencia tabla-por-tipo, PK compartida `id_usuario`).
 - Un **Comprador** tiene 0 o más **Carritos**; un Carrito pertenece a 1 Comprador (FK via `id_usuario`).
-- Un **Carrito** contiene 1 o más **Productos** (vía `Carrito_Producto` con `cantidad`).
-- Un **Carrito** tiene 0 o 1 **Pago** directo; un Pago corresponde a 1 Carrito.
-- Un **Pago** genera 1 **Factura**.
-- Un **Carrito** tiene 0 o 1 **Envío** directo; un Envío corresponde a 1 Carrito.
-- Un **Producto** tiene 1 o más **Variantes_Producto** (precio y concentración por variante).
-- Un **Producto** pertenece a 0 o más **Categorías**.
-- Un **Proveedor** suministra 0 o más **Productos** (vía `Proveedor_Producto`).
+- Un **Carrito** contiene 1 o más **Productos** (vía `CarritoProducto` con `cantidad`).
+- Un **Carrito** tiene 0 o 1 **Pago** (`id_carrito` UNIQUE en Pago).
+- Un **Pago** genera 0 o 1 **Factura** (`id_pago` UNIQUE en Factura).
+- Un **Carrito** tiene 0 o 1 **Envío** (`id_carrito` UNIQUE en Envio).
+- Un **Producto** tiene 1 o más **VarianteProducto** (relación 1:N directa, FK `id_producto` en la variante).
+- Un **Producto** pertenece a 0 o más **Categorías** (vía `ProductoCategoria`).
+- Un **Proveedor** suministra 0 o más **Productos** (vía `ProveedorProducto`).
 
 ---
 
@@ -374,15 +377,15 @@ model Envio {
 
 | Capa | Tecnología | Uso |
 |---|---|---|
-| Frontend | Next.js + React | UI del marketplace: catálogo, carrito, checkout, historial, panel vendedor. |
+| Frontend | Next.js 16 + React | UI del marketplace: catálogo, carrito, checkout, historial, panel vendedor. |
 | Estilos | Tailwind CSS | Diseño responsivo y componentes visuales. |
 | Backend API | Next.js API Routes | Controladores REST para todos los servicios del sistema. |
 | Autenticación | Clerk | Gestión de sesiones, roles (comprador/vendedor) y seguridad. |
-| ORM | Prisma | Modelado de datos, migraciones y queries tipadas. |
+| ORM | Prisma 7 | Modelado de datos, migraciones y queries tipadas. Config en `prisma.config.ts`. |
 | Base de datos | PostgreSQL | Base de datos relacional principal. |
-| Pagos | Sistema externo (Stripe / MercadoPago) | Procesamiento de cobros y confirmaciones. |
+| Pagos | Sistema externo (Stripe / MercadoPago) | Procesamiento de cobros y confirmaciones vía webhook. |
 | Envíos | Sistema externo | Gestión de despachos y tracking. |
-| Notificaciones | Servicio asíncrono (Resend / Nodemailer) | Correos automáticos de confirmación y estado. Falla gracefully. |
+| Notificaciones | Servicio asíncrono (Resend / Nodemailer) | Correos automáticos de confirmación y estado. Falla gracefully (fire-and-forget). |
 
 ---
 
@@ -393,10 +396,10 @@ model Envio {
 1. El **Comprador** navega el catálogo y busca productos por nombre, categoría o notas olfativas.
 2. Agrega uno o más productos (variantes) al **Carrito**.
 3. Inicia el **Checkout**: el Controlador Checkout invoca al Servicio Stock ATOMICIDAD.
-4. El **Servicio Stock ATOMICIDAD** valida que haya stock real y reserva los ítems por **5 minutos**.
-5. Si la reserva es exitosa, se crea el **Pago** con estado `pendiente` vinculado al Carrito.
+4. El **Servicio Stock ATOMICIDAD** valida que haya stock real y decrementa el stock dentro de una `$transaction` de Prisma.
+5. Si la transacción es exitosa, se crea el **Pago** con estado `pendiente` vinculado al Carrito. El Carrito pasa a estado `convertido`.
 6. El sistema redirige al **Sistema de Pagos** externo.
-7. Confirmado el pago, se genera la **Factura** y el **Envío** con estado `preparando`.
+7. La pasarela confirma el pago vía **webhook** (HMAC-SHA256). Si es aprobado, se generan la **Factura** y el **Envío** con estado `preparando`.
 8. El **Servicio Notificación** envía un correo de confirmación de forma asíncrona.
 9. El **Sistema de Envíos** externo recibe el pedido y provee un `track_code`.
 10. El Comprador puede consultar el estado en el **Historial de Pedidos**.
@@ -410,88 +413,148 @@ model Envio {
 
 ### 6.3 Flujo de Recomendaciones
 
-1. El **Motor de Recomendación** analiza el historial de compras y productos visitados.
-2. Calcula similitudes basadas en **notas de salida, corazón y fondo**, e ingredientes.
-3. Devuelve una lista de productos recomendados personalizada al Comprador.
+1. El usuario visita la página de detalle de un producto.
+2. El **Motor de Recomendación** calcula similitudes usando el índice de **Jaccard** sobre las notas olfativas (salida, corazón y fondo) e ingredientes.
+3. Pesos aplicados: notas_corazon 40%, notas_salida 30%, notas_fondo 20%, ingrediente 10%.
+4. Devuelve los **6 productos más similares** con stock disponible.
 
 ### 6.4 Reserva Temporal de Stock (Atomicidad)
 
-El **Servicio Stock ATOMICIDAD** implementa una reserva temporal de **5 minutos** durante el checkout. Si el usuario no completa el pago en ese tiempo, la reserva se libera automáticamente y el stock queda disponible nuevamente. Esto previene la **sobreventa** en escenarios de alta concurrencia.
+El **Servicio Stock ATOMICIDAD** (`src/lib/stock.ts`) implementa el checkout dentro de una `prisma.$transaction`. Valida el stock real, lo decrementa y crea el Pago en una sola operación atómica. Esto previene la **sobreventa** en escenarios de alta concurrencia.
 
 ---
 
 ## 7. Estructura de Proyecto Next.js
 
 ```
-fragance-elegancio/
-├── app/
-│   ├── (auth)/
-│   │   ├── sign-in/              → Clerk SignIn
-│   │   └── sign-up/              → Clerk SignUp
-│   ├── (marketplace)/
-│   │   ├── catalogo/             → Listado de productos
-│   │   ├── producto/[id]/        → Detalle de producto
-│   │   ├── carrito/              → Vista del carrito
-│   │   ├── checkout/             → Proceso de compra
-│   │   ├── pedidos/              → Historial de pedidos
-│   │   └── recomendaciones/      → Motor de recomendación
-│   ├── (vendedor)/
-│   │   ├── inventario/           → CRUD de productos
-│   │   └── ordenes/              → Órdenes recibidas
-│   └── api/
-│       ├── auth/                 → Webhooks Clerk
-│       ├── catalogo/             → GET productos, categorías
-│       ├── carrito/              → CRUD carrito
-│       ├── checkout/             → POST crear orden + reserva stock
-│       ├── pagos/                → Webhook confirmación pago
-│       ├── envios/               → Tracking y estado
-│       ├── inventario/           → CRUD vendedor
-│       └── recomendaciones/      → GET recomendaciones
-├── components/
-│   ├── ui/                       → Componentes base reutilizables
-│   ├── catalogo/                 → ProductCard, Filtros, Buscador
-│   ├── carrito/                  → CartDrawer, CartItem
-│   └── checkout/                 → CheckoutForm, OrderSummary
-├── lib/
-│   ├── prisma.ts                 → PrismaClient singleton
-│   ├── stock.ts                  → Lógica de atomicidad y reserva
-│   └── recomendaciones.ts        → Motor de recomendación
+fragancio-elegancio/
+├── src/
+│   ├── proxy.ts                  → Auth middleware Clerk (Next.js 16)
+│   ├── app/
+│   │   ├── (auth)/
+│   │   │   ├── sign-in/          → Clerk SignIn
+│   │   │   └── sign-up/          → Clerk SignUp
+│   │   ├── (marketplace)/
+│   │   │   ├── catalogo/         → Listado de productos
+│   │   │   ├── producto/[id]/    → Detalle de producto
+│   │   │   ├── carrito/          → Vista del carrito
+│   │   │   ├── checkout/         → Proceso de compra
+│   │   │   ├── pedidos/          → Historial de pedidos
+│   │   │   └── recomendaciones/  → Productos recomendados
+│   │   ├── (vendedor)/
+│   │   │   ├── inventario/       → CRUD de productos
+│   │   │   └── ordenes/          → Órdenes recibidas
+│   │   └── api/
+│   │       ├── auth/             → Webhook de Clerk (sincroniza usuarios)
+│   │       ├── catalogo/         → GET productos y categorías
+│   │       ├── carrito/          → CRUD carrito
+│   │       ├── checkout/         → POST crear pago + decremento de stock
+│   │       ├── pagos/webhook/    → Webhook confirmación de pago
+│   │       ├── envios/[id]/      → Tracking y actualización de estado
+│   │       ├── inventario/       → CRUD vendedor
+│   │       └── recomendaciones/  → GET recomendaciones por similitud Jaccard
+│   └── lib/
+│       ├── prisma.ts             → PrismaClient singleton
+│       ├── stock.ts              → Checkout atómico ($transaction)
+│       └── recomendaciones.ts    → Motor de similitud Jaccard
 ├── prisma/
 │   ├── schema.prisma             → Modelo de datos completo
+│   ├── seed.ts                   → ETL de catálogo desde PerfumAPI
 │   └── migrations/
-├── middleware.ts                 → Auth middleware Clerk
-└── .env                          → DATABASE_URL, CLERK_*, etc.
+├── prisma.config.ts              → Config de Prisma 7 (datasource URL)
+├── docs/                         → Documentación de la materia
+└── openapi.yaml                  → Especificación OpenAPI
 ```
 
 ---
 
-## 8. Consideraciones de Seguridad y Arquitecturales
+## 8. Setup y Comandos
 
-### 8.1 Autenticación y Autorización
+### Requisitos previos
 
-- **Clerk** gestiona el ciclo completo de autenticación (OAuth, email/password, MFA).
-- Los roles `comprador` y `vendedor` se codifican como metadata en el token de Clerk.
-- El `middleware.ts` de Next.js protege todas las rutas privadas verificando el token antes de cualquier handler.
-- El **Controlador Autorización** verifica el rol en cada endpoint sensible del API.
+- Node.js 20+
+- PostgreSQL (local o remoto)
 
-### 8.2 Consistencia Transaccional
+### Instalación
 
-- Las operaciones de checkout usan transacciones Prisma (`$transaction`) para garantizar atomicidad.
-- El **Servicio Stock ATOMICIDAD** implementa bloqueos optimistas para prevenir condiciones de carrera.
-- La reserva temporal de 5 minutos libera el stock automáticamente si el pago no se completa.
+```bash
+# 1. Instalar dependencias
+npm install
 
-### 8.3 Resiliencia
+# 2. Configurar variables de entorno
+cp .env.example .env.local
+# Completar los valores en .env.local
 
-- El **Servicio Notificación** es asíncrono y su falla **no bloquea** la compra (patrón fire-and-forget con reintentos).
-- Las integraciones con sistemas externos (Pagos, Envíos) están desacopladas mediante **webhooks**.
-- El **API Gateway** centraliza el manejo de errores, rate limiting y logging.
+# 3. Correr migraciones
+npx prisma migrate dev
 
-### 8.4 Escalabilidad
+# 4. Cargar catálogo inicial (consume PerfumAPI externa)
+npx prisma db seed
 
-- La arquitectura de microservicios permite escalar componentes individualmente (ej. escalar solo el Servicio Catálogo en picos de búsqueda).
-- Next.js permite **SSR/SSG** para páginas del catálogo, reduciendo la carga del servidor en páginas de alta demanda.
-- Prisma Connection Pooling (ej. con PgBouncer) para manejar múltiples conexiones concurrentes.
+# 5. Iniciar servidor de desarrollo
+npm run dev
+```
+
+### Variables de entorno
+
+| Variable | Descripción |
+|---|---|
+| `DATABASE_URL` | Connection string de PostgreSQL |
+| `CLERK_SECRET_KEY` | Clave secreta de Clerk |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clave pública de Clerk |
+| `CLERK_WEBHOOK_SECRET` | Secret para validar webhooks de Clerk |
+| `PAYMENT_WEBHOOK_SECRET` | Secret HMAC-SHA256 para validar webhooks de la pasarela de pagos |
+
+### Comandos útiles
+
+| Comando | Descripción |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción |
+| `npm run lint` | ESLint |
+| `npx prisma migrate dev` | Correr migraciones |
+| `npx prisma generate` | Regenerar Prisma Client tras cambios en el schema |
+| `npx prisma studio` | Explorar la base de datos en el browser |
+| `npx prisma db seed` | Cargar catálogo de fragancias desde PerfumAPI |
 
 ---
 
-*Fragance Elegancio — Documento de Arquitectura v1.0*
+## 9. Consideraciones de Seguridad y Arquitecturales
+
+### 9.1 Autenticación y Autorización
+
+- **Clerk** gestiona el ciclo completo de autenticación (OAuth, email/password, MFA).
+- Los roles `comprador` y `vendedor` se codifican como `publicMetadata` en el token de Clerk.
+- `src/proxy.ts` protege todas las rutas privadas verificando el token antes de cualquier handler (equivalente al `middleware.ts` en versiones anteriores de Next.js).
+- Cada endpoint sensible del API verifica adicionalmente el rol del token antes de ejecutar la lógica de negocio.
+
+### 9.2 Consistencia Transaccional
+
+- Las operaciones de checkout usan transacciones Prisma (`$transaction`) para garantizar atomicidad.
+- El **Servicio Stock ATOMICIDAD** (`src/lib/stock.ts`) valida y decrementa el stock en la misma transacción que crea el Pago, previniendo condiciones de carrera.
+
+### 9.3 Resiliencia
+
+- El **Servicio Notificación** es asíncrono y su falla **no bloquea** la compra (patrón fire-and-forget).
+- Las integraciones con sistemas externos (Pagos, Envíos) están desacopladas mediante **webhooks**.
+- El webhook de pagos implementa **verificación HMAC-SHA256** e **idempotencia** (no procesa el mismo evento dos veces).
+
+### 9.4 Escalabilidad
+
+- Next.js permite **SSR/SSG** para páginas del catálogo, reduciendo la carga del servidor en páginas de alta demanda.
+- Prisma Connection Pooling para manejar múltiples conexiones concurrentes.
+- El motor de recomendaciones opera completamente en memoria (O(n) sobre el catálogo), viable para catálogos de hasta ~10 000 productos.
+
+---
+
+## Grupo 17 — Arquitectura y Diseño de Sistemas 2026
+
+- Agostino Laurella Crippa
+- Pierino Oscar Spina
+- Ana Martina Andrés
+- Tomás Copelotti
+- José Ignacio Ubici
+
+---
+
+*Fragancio Elegancio — Documento de Arquitectura v1.1*

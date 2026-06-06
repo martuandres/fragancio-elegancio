@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline de Datos — Entregable 4 — Grupo 17</title>
+  <style>
+    /* ── Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11pt;
+      color: #1a1a1a;
+      background: #fff;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 48px;
+      line-height: 1.55;
+    }
+
+    /* ── Portada ── */
+    .cover {
+      text-align: center;
+      border-bottom: 3px solid #1a3a5c;
+      padding-bottom: 28px;
+      margin-bottom: 36px;
+    }
+    .cover .label {
+      font-size: 10pt;
+      color: #555;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .cover h1 {
+      font-size: 26pt;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-bottom: 6px;
+    }
+    .cover .subtitle {
+      font-size: 12pt;
+      color: #2a6496;
+      margin-bottom: 16px;
+    }
+    .cover .meta {
+      font-size: 10pt;
+      color: #444;
+    }
+
+    /* ── Índice de pipelines ── */
+    .toc {
+      background: #f4f8fc;
+      border-left: 4px solid #2a6496;
+      padding: 14px 20px;
+      margin-bottom: 40px;
+      border-radius: 0 4px 4px 0;
+    }
+    .toc h2 { font-size: 10pt; color: #2a6496; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .toc ol { padding-left: 18px; }
+    .toc li { margin-bottom: 4px; color: #1a3a5c; font-weight: 500; }
+
+    /* ── Sección de pipeline ── */
+    .pipeline { margin-bottom: 56px; page-break-inside: avoid; }
+    .pipeline-header {
+      background: #1a3a5c;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 4px 4px 0 0;
+      margin-bottom: 0;
+    }
+    .pipeline-header .pipeline-num { font-size: 9pt; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.08em; }
+    .pipeline-header h2 { font-size: 14pt; font-weight: 700; margin-top: 2px; }
+    .pipeline-header .pipeline-type {
+      display: inline-block;
+      margin-top: 6px;
+      background: rgba(255,255,255,0.18);
+      border-radius: 3px;
+      padding: 2px 10px;
+      font-size: 9pt;
+      letter-spacing: 0.04em;
+    }
+    .pipeline-desc {
+      background: #eef4fa;
+      border: 1px solid #c5d9ed;
+      border-top: none;
+      padding: 10px 18px;
+      font-style: italic;
+      color: #2a4a6a;
+      font-size: 10.5pt;
+    }
+
+    /* ── Paso ── */
+    .step { border: 1px solid #d0d7de; border-top: none; }
+    .step:last-child { border-radius: 0 0 4px 4px; }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+      font-weight: 700;
+      font-size: 9.5pt;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #d0d7de;
+    }
+    .step-1 .step-header { background: #dce8f5; color: #1a3a5c; }
+    .step-2 .step-header { background: #dce8f5; color: #1a3a5c; }
+    .step-3 .step-header { background: #1e5f8a; color: #fff; }
+    .step-4 .step-header { background: #2a8a5c; color: #fff; }
+    .step-5 .step-header { background: #5a2d8a; color: #fff; }
+
+    .step-body { padding: 0; }
+
+    /* ── Tabla de datos ── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10.5pt;
+    }
+    table tr:not(:last-child) td { border-bottom: 1px solid #e8edf2; }
+    table td { padding: 8px 14px; vertical-align: top; }
+    table td:first-child {
+      font-weight: 600;
+      color: #2a4a6a;
+      width: 30%;
+      white-space: nowrap;
+    }
+    table tr:nth-child(even) { background: #f9fbfd; }
+
+    /* ── Sub-pasos de procesamiento ── */
+    .substep {
+      padding: 8px 14px;
+      border-bottom: 1px solid #e8edf2;
+      display: grid;
+      grid-template-columns: 30% 70%;
+    }
+    .substep:nth-child(even) { background: #f9fbfd; }
+    .substep-label {
+      font-weight: 600;
+      color: #2a4a6a;
+      padding-right: 12px;
+    }
+    .substep-desc { }
+
+    /* ── Badge de tipo ── */
+    .badge {
+      display: inline-block;
+      border-radius: 3px;
+      padding: 1px 8px;
+      font-size: 8.5pt;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+    }
+    .badge-batch    { background: #fdebc8; color: #7a4800; }
+    .badge-event    { background: #d4edda; color: #155724; }
+    .badge-ondemand { background: #d6eaf8; color: #1a4a7a; }
+    .badge-etl      { background: #f3e5f5; color: #4a1a6a; }
+
+    /* ── Arrow connector ── */
+    .arrow {
+      text-align: center;
+      font-size: 14pt;
+      color: #2a6496;
+      padding: 4px 0;
+      background: #fff;
+      border-left: 1px solid #d0d7de;
+      border-right: 1px solid #d0d7de;
+    }
+
+    /* ── Print ── */
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="cover">
+  <div class="label">Arquitectura y Diseño de Sistemas 2026</div>
+  <h1>Descripción del Pipeline de Datos</h1>
+  <div class="subtitle">Entregable 4 · Práctica de Arquitectura y Diseño de Sistemas 2026</div>
+  <div class="meta">
+    <strong>Grupo 17</strong> &nbsp;·&nbsp; Marketplace de Fragancias — <em>Fragancio Elegancio</em>
+  </div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="toc">
+  <h2>Pipelines documentados</h2>
+  <ol>
+    <li>ETL de Catálogo de Fragancias &nbsp;<span class="badge badge-etl">Batch / ETL</span></li>
+    <li>Procesamiento de Compra &nbsp;<span class="badge badge-event">Event-Driven</span></li>
+    <li>Motor de Recomendaciones &nbsp;<span class="badge badge-ondemand">On-Demand</span></li>
+  </ol>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PIPELINE 1: ETL Catálogo                                      -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="pipeline">
+  <div class="pipeline-header">
+    <div class="pipeline-num">Pipeline 1</div>
+    <h2>ETL de Catálogo de Fragancias</h2>
+    <div class="pipeline-type">Batch · ETL</div>
+  </div>
+  <div class="pipeline-desc">
+    Carga y normaliza el catálogo inicial de perfumes desde una API externa hacia la base de datos del sistema, permitiendo que el marketplace tenga productos desde el primer arranque.
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step step-1">
+    <div class="step-header">▼ &nbsp;Paso 1 — Origen de los datos</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué datos?</td>
+          <td>Perfumes en formato JSON: <code>name</code>, <code>brand</code>, <code>notes_top[]</code>, <code>notes_middle[]</code>, <code>notes_base[]</code>, <code>description</code>, <code>gender</code>, <code>image_url</code>.</td>
+        </tr>
+        <tr>
+          <td>¿Desde dónde?</td>
+          <td>API externa: <code>https://perfumapidatabase.onrender.com/perfumes?limit=100</code></td>
+        </tr>
+        <tr>
+          <td>¿Con qué frecuencia llegan?</td>
+          <td>Una única petición HTTP GET al momento de ejecutar el seed. No hay ingestión continua.</td>
+        </tr>
+        <tr>
+          <td>¿Volumen estimado?</td>
+          <td>Hasta 100 perfumes por ejecución (~15 KB de JSON). Operación de setup, no recurrente.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step step-2">
+    <div class="step-header">▼ &nbsp;Paso 2 — Disparador / Trigger</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Cuándo se ejecuta?</td>
+          <td>Manualmente por el equipo de desarrollo durante la inicialización del sistema, mediante el comando <code>npx prisma db seed</code>.</td>
+        </tr>
+        <tr>
+          <td>¿Quién lo dispara?</td>
+          <td>El administrador del sistema (desarrollador) desde la terminal. No existe scheduler ni trigger automático.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step step-3">
+    <div class="step-header">▼ &nbsp;Paso 3 — Procesamiento</div>
+    <div class="step-body">
+      <div class="substep">
+        <div class="substep-label">¿Qué componente lo ejecuta?</div>
+        <div class="substep-desc">Script <code>prisma/seed.ts</code> — Node.js con Prisma Client. Se ejecuta en el contexto del servidor de base de datos.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 1 — Extracción</div>
+        <div class="substep-desc">Fetch HTTP GET a la API externa. Se acepta respuesta como array directo o dentro del campo <code>perfumes</code> (manejo de dos formatos posibles).</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 2 — Validación</div>
+        <div class="substep-desc">Se descartan registros sin <code>name</code> o <code>brand</code> (campos obligatorios para unicidad en la BD). El resto continúa el flujo.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 3 — Normalización</div>
+        <div class="substep-desc">
+          Transformaciones aplicadas:
+          <ul style="margin-top:4px; padding-left:16px;">
+            <li><code>name</code> y <code>brand</code> → <code>.trim()</code></li>
+            <li><code>notes_top[]</code>, <code>notes_middle[]</code>, <code>notes_base[]</code> → <code>.join(", ")</code> para almacenarlas como texto plano (formato compatible con el motor de recomendaciones)</li>
+            <li>Campos opcionales (<code>description</code>, <code>image_url</code>, <code>gender</code>) → <code>null</code> si ausentes</li>
+          </ul>
+        </div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 4 — Enriquecimiento</div>
+        <div class="substep-desc">Se asignan valores por defecto para la primera variante de cada producto: <code>stock = 10</code>, <code>volumen = 50 ml</code>, <code>precio = 50 000</code>, <code>ranking = 1</code>, <code>concentracion = gender</code> (del perfume original).</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 5 — Carga (Upsert)</div>
+        <div class="substep-desc">Se ejecuta <code>prisma.producto.upsert</code> con clave única <code>(nombre, marca)</code>. Si el producto ya existe, se actualizan sus campos. Solo si no tiene ninguna variante asociada se crea una con los valores por defecto.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">¿Hay lógica de error?</div>
+        <div class="substep-desc">Si la API externa falla (HTTP != 2xx), se lanza una excepción que detiene la ejecución y devuelve exit code 1. Registros individuales inválidos (sin nombre/marca) se descartan silenciosamente con <code>continue</code>. No hay reintentos automáticos.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 4 -->
+  <div class="step step-4">
+    <div class="step-header">▼ &nbsp;Paso 4 — Salida / Destino</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué se produce?</td>
+          <td>Registros persistidos en las tablas <code>Producto</code> (nombre, marca, stock, notas olfativas, imagen) y <code>VarianteProducto</code> (precio, volumen, concentración, ranking).</td>
+        </tr>
+        <tr>
+          <td>¿Dónde se guarda?</td>
+          <td>Base de datos PostgreSQL gestionada por Prisma ORM. Tabla <code>Producto</code> con unicidad compuesta <code>(nombre, marca)</code>; tabla <code>VarianteProducto</code> con FK <code>id_producto</code>.</td>
+        </tr>
+        <tr>
+          <td>¿Quién consume el resultado?</td>
+          <td>El catálogo del marketplace: <code>GET /api/catalogo</code>, la página <code>/catalogo</code> y el motor de recomendaciones. El resultado es el punto de partida de todos los demás pipelines.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 5 -->
+  <div class="step step-5">
+    <div class="step-header">▼ &nbsp;Paso 5 — Decisión Arquitectónica</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Por qué este enfoque?</td>
+          <td>Se eligió un ETL batch manual porque el catálogo de fragancias es estático (no cambia en tiempo real): un marketplace de este tipo parte de un inventario inicial fijo que los vendedores luego amplían. El batch evita la complejidad de un pipeline streaming para datos que no lo requieren.</td>
+        </tr>
+        <tr>
+          <td>Trade-offs aceptados</td>
+          <td>
+            <ul style="padding-left:16px;">
+              <li><strong>No hay actualización automática del catálogo</strong>: si la API externa añade nuevos perfumes, hay que re-ejecutar el seed manualmente.</li>
+              <li><strong>Sin reintentos automáticos</strong>: si la API externa cae durante el seed, hay que repetir el proceso completo.</li>
+              <li><strong>Precios y stock son placeholders</strong>: los vendedores deben ajustar estos valores vía la API de inventario tras la carga inicial.</li>
+            </ul>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PIPELINE 2: Procesamiento de Compra                           -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="pipeline">
+  <div class="pipeline-header">
+    <div class="pipeline-num">Pipeline 2</div>
+    <h2>Procesamiento de Compra</h2>
+    <div class="pipeline-type">Event-Driven</div>
+  </div>
+  <div class="pipeline-desc">
+    Orquesta el flujo completo de una compra: desde que el comprador confirma su carrito hasta que el pago es procesado por una pasarela externa y se genera la factura y el envío. Se compone de dos eventos encadenados: el checkout iniciado por el usuario y el webhook de confirmación de la pasarela de pago.
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step step-1">
+    <div class="step-header">▼ &nbsp;Paso 1 — Origen de los datos</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué datos?</td>
+          <td>
+            <strong>Evento A (Checkout):</strong> Token de sesión Clerk del comprador + estado del Carrito activo: <code>id_carrito</code>, lista de <code>{id_producto, cantidad}</code>.<br/><br/>
+            <strong>Evento B (Webhook):</strong> Payload JSON de la pasarela: <code>{id_carrito, estado}</code> donde <code>estado ∈ {aprobado, rechazado}</code>. Incluye header <code>x-webhook-signature</code> (HMAC-SHA256).
+          </td>
+        </tr>
+        <tr>
+          <td>¿Desde dónde?</td>
+          <td>
+            <strong>Evento A:</strong> HTTP POST del browser del comprador a <code>/api/checkout</code>. El carrito se lee desde PostgreSQL.<br/>
+            <strong>Evento B:</strong> HTTP POST de la pasarela externa (Stripe / MercadoPago) a <code>/api/pagos/webhook</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>¿Con qué frecuencia llegan?</td>
+          <td>Ante cada intento de compra de un usuario. El webhook llega minutos después del checkout, una vez que la pasarela confirma el pago.</td>
+        </tr>
+        <tr>
+          <td>¿Volumen estimado?</td>
+          <td>Bajo en un marketplace académico: estimado &lt; 100 compras/día. Cada transacción involucra ~5 items en promedio. El impacto es acotado pero la criticidad es alta (dinero real).</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step step-2">
+    <div class="step-header">▼ &nbsp;Paso 2 — Disparador / Trigger</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Cuándo se ejecuta?</td>
+          <td>
+            <strong>Evento A:</strong> Acción del usuario (comprador hace clic en "Confirmar compra").<br/>
+            <strong>Evento B:</strong> Callback asíncrono de la pasarela de pago, tipicamente segundos o minutos después del Evento A.
+          </td>
+        </tr>
+        <tr>
+          <td>¿Quién lo dispara?</td>
+          <td>
+            <strong>Evento A:</strong> El browser del comprador vía HTTP POST.<br/>
+            <strong>Evento B:</strong> El sistema externo de pagos (Stripe / MercadoPago) vía webhook HTTP POST.
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step step-3">
+    <div class="step-header">▼ &nbsp;Paso 3 — Procesamiento</div>
+    <div class="step-body">
+      <div class="substep">
+        <div class="substep-label">¿Qué componente lo ejecuta?</div>
+        <div class="substep-desc">
+          <strong>Evento A:</strong> <code>src/app/api/checkout/route.ts</code> + <code>src/lib/stock.ts</code> — Next.js API Route (Node.js).<br/>
+          <strong>Evento B:</strong> <code>src/app/api/pagos/webhook/route.ts</code> — Next.js API Route (Node.js).
+        </div>
+      </div>
+
+      <div class="substep" style="background:#e8f4ff;">
+        <div class="substep-label" style="color:#1a3a5c; font-size:10pt;">── EVENTO A: Checkout ──</div>
+        <div class="substep-desc"></div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Paso 1 — Autenticación y autorización</div>
+        <div class="substep-desc">Se verifica el token Clerk. Si el usuario no está autenticado → <code>401</code>. Si el rol no es <code>comprador</code> → <code>403</code>. Se resuelve el <code>id_usuario</code> del Comprador en la BD vía su email.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 2 — Recuperación del Carrito</div>
+        <div class="substep-desc">Se busca el Carrito con <code>estado = "activo"</code> del comprador. Si no existe → <code>404</code>. Si está vacío → <code>400</code>.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 3 — Transacción atómica (stock.ts)</div>
+        <div class="substep-desc">
+          Dentro de <code>prisma.$transaction</code>, por cada ítem:
+          <ol style="margin-top:4px; padding-left:18px;">
+            <li>Consulta stock actual del Producto.</li>
+            <li>Valida que <code>stock ≥ cantidad</code>. Si falla, toda la transacción se revierte.</li>
+            <li>Decrementa stock: <code>UPDATE Producto SET stock = stock - cantidad</code>.</li>
+            <li>Acumula <code>precio × cantidad</code> para calcular el total.</li>
+          </ol>
+          Al finalizar el loop: crea registro <code>Pago</code> con <code>estado = "pendiente"</code> y actualiza <code>Carrito.estado = "convertido"</code>.
+        </div>
+      </div>
+
+      <div class="substep" style="background:#e8f4ee;">
+        <div class="substep-label" style="color:#1a4a2a; font-size:10pt;">── EVENTO B: Webhook de Pago ──</div>
+        <div class="substep-desc"></div>
+      </div>
+
+      <div class="substep">
+        <div class="substep-label">Paso 4 — Verificación de firma</div>
+        <div class="substep-desc">Se recalcula la firma HMAC-SHA256 del body con el <code>WEBHOOK_SECRET</code> y se compara con el header <code>x-webhook-signature</code> usando <code>crypto.timingSafeEqual</code> (resistente a timing attacks). Firma inválida → <code>401</code>.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 5 — Validación e idempotencia</div>
+        <div class="substep-desc">Se verifica que exista un <code>Pago</code> asociado al <code>id_carrito</code>. Si el pago ya fue aprobado previamente → <code>409</code> (idempotencia: protege contra webhooks duplicados de la pasarela).</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 6 — Actualización de estado y generación de comprobantes</div>
+        <div class="substep-desc">
+          Si <code>estado = "aprobado"</code>:
+          <ol style="margin-top:4px; padding-left:18px;">
+            <li>Actualiza <code>Pago.estado = "aprobado"</code>.</li>
+            <li>Recalcula el importe total desde <code>CarritoProducto</code> × precios de <code>VarianteProducto</code>.</li>
+            <li>Crea registro <code>Factura</code> con <code>importe_total</code> y fecha de emisión (CUID autogenerado).</li>
+            <li>Crea registro <code>Envio</code> con <code>estado = "preparando"</code>.</li>
+          </ol>
+          Si <code>estado = "rechazado"</code>: solo actualiza <code>Pago.estado = "rechazado"</code>. No se crea Factura ni Envío.
+        </div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">¿Hay lógica de error?</div>
+        <div class="substep-desc">
+          La transacción atómica del Evento A garantiza que o todo el stock se decrementa y el Pago se crea, o nada cambia. Si falla → <code>409 CHECKOUT_FALLIDO</code> con mensaje descriptivo.<br/>
+          El Evento B es idempotente: puede recibirse múltiples veces sin efectos adicionales una vez aprobado.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 4 -->
+  <div class="step step-4">
+    <div class="step-header">▼ &nbsp;Paso 4 — Salida / Destino</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué se produce?</td>
+          <td>
+            <strong>Evento A:</strong> Registro <code>Pago</code> con <code>estado = "pendiente"</code>. Respuesta HTTP 201 con <code>{id_pago, importe_total, estado}</code>.<br/><br/>
+            <strong>Evento B:</strong> <code>Pago</code> actualizado + registro <code>Factura</code> (con <code>nro_factura</code>) + registro <code>Envio</code> con <code>estado = "preparando"</code>.
+          </td>
+        </tr>
+        <tr>
+          <td>¿Dónde se guarda?</td>
+          <td>PostgreSQL: tablas <code>Pago</code> (<code>id_carrito</code> único), <code>Factura</code> (<code>id_pago</code> único, <code>nro_factura</code> CUID), <code>Envio</code> (<code>id_carrito</code> único).</td>
+        </tr>
+        <tr>
+          <td>¿Quién consume el resultado?</td>
+          <td>
+            El frontend del comprador consulta el resultado vía <code>GET /api/pedidos/{id_carrito}</code>.<br/>
+            El vendedor consulta el estado del pedido y actualiza el envío vía <code>PATCH /api/envios/{id_carrito}</code>.<br/>
+            El sistema de notificaciones (Resend / Nodemailer) envía el email de confirmación de forma asíncrona.
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 5 -->
+  <div class="step step-5">
+    <div class="step-header">▼ &nbsp;Paso 5 — Decisión Arquitectónica</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Por qué este enfoque?</td>
+          <td>Se eligió event-driven desacoplado (checkout → pasarela → webhook) para no bloquear al usuario esperando la respuesta del sistema de pagos externo. El checkout responde inmediatamente con el <code>id_pago</code> y la pasarela confirma de forma asíncrona. Esto mejora la experiencia de usuario y desacopla el sistema de las latencias externas. La transacción <code>$transaction</code> de Prisma garantiza atomicidad en el decremento de stock para prevenir sobreventa bajo concurrencia.</td>
+        </tr>
+        <tr>
+          <td>Trade-offs aceptados</td>
+          <td>
+            <ul style="padding-left:16px;">
+              <li><strong>El stock se decrementa antes de confirmar el pago:</strong> si el pago es rechazado, el stock no se restaura automáticamente. Esto se acepta para simplificar el flujo en el contexto del proyecto.</li>
+              <li><strong>Sin reintentos en el webhook:</strong> si el servidor cae mientras procesa el webhook, la pasarela puede reintentar según su configuración. El diseño idempotente lo maneja correctamente.</li>
+              <li><strong>Sin reserva temporal expirada:</strong> el diseño original preveía liberar el stock luego de 5 minutos si el pago no se completaba; esta funcionalidad quedó simplificada para el alcance actual.</li>
+            </ul>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PIPELINE 3: Motor de Recomendaciones                          -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="pipeline">
+  <div class="pipeline-header">
+    <div class="pipeline-num">Pipeline 3</div>
+    <h2>Motor de Recomendaciones</h2>
+    <div class="pipeline-type">On-Demand (Request-Response)</div>
+  </div>
+  <div class="pipeline-desc">
+    Calcula en tiempo real los productos más similares a uno dado, usando similitud de Jaccard sobre las notas olfativas (salida, corazón y fondo) e ingredientes. El resultado se devuelve al usuario sin persistencia: cada consulta recalcula desde cero.
+  </div>
+
+  <!-- PASO 1 -->
+  <div class="step step-1">
+    <div class="step-header">▼ &nbsp;Paso 1 — Origen de los datos</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué datos?</td>
+          <td>Campos textuales de la tabla <code>Producto</code>: <code>notas_salida</code>, <code>notas_corazon</code>, <code>notas_fondo</code> e <code>ingrediente</code> (todos en formato texto libre, separados por comas). También se recupera la variante de mayor ranking (<code>precio</code>, <code>concentracion</code>) para incluirla en la respuesta.</td>
+        </tr>
+        <tr>
+          <td>¿Desde dónde?</td>
+          <td>Base de datos PostgreSQL vía Prisma. Dos consultas: una para el producto base y una para todos los productos candidatos con <code>stock &gt; 0</code>.</td>
+        </tr>
+        <tr>
+          <td>¿Con qué frecuencia llegan?</td>
+          <td>Ante cada visita de un usuario a la página de detalle de un producto (<code>GET /api/recomendaciones?productoId=N</code>).</td>
+        </tr>
+        <tr>
+          <td>¿Volumen estimado?</td>
+          <td>El catálogo tiene ~100 productos (cargados por el seed). Cada consulta compara el producto base contra los ~99 restantes. La operación es completamente en memoria, con complejidad O(n) sobre el catálogo.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 2 -->
+  <div class="step step-2">
+    <div class="step-header">▼ &nbsp;Paso 2 — Disparador / Trigger</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Cuándo se ejecuta?</td>
+          <td>En tiempo real, ante cada request HTTP GET al endpoint <code>/api/recomendaciones</code>. No hay programación periódica ni batch.</td>
+        </tr>
+        <tr>
+          <td>¿Quién lo dispara?</td>
+          <td>El componente del frontend que muestra la sección "Productos similares" en la página de detalle de un perfume. El parámetro <code>productoId</code> identifica el producto base.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 3 -->
+  <div class="step step-3">
+    <div class="step-header">▼ &nbsp;Paso 3 — Procesamiento</div>
+    <div class="step-body">
+      <div class="substep">
+        <div class="substep-label">¿Qué componente lo ejecuta?</div>
+        <div class="substep-desc"><code>src/lib/recomendaciones.ts</code> (lógica) invocado por <code>src/app/api/recomendaciones/route.ts</code> (API Route). Node.js, procesamiento completamente en memoria.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 1 — Obtención del producto base</div>
+        <div class="substep-desc">Query a la BD para recuperar <code>notas_salida</code>, <code>notas_corazon</code>, <code>notas_fondo</code> e <code>ingrediente</code> del producto con el <code>id_producto</code> recibido. Si no existe → <code>404</code>.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 2 — Obtención de candidatos</div>
+        <div class="substep-desc">Query a la BD para recuperar todos los productos con <code>stock &gt; 0</code>, excluyendo el producto base. Se incluye la variante de mayor ranking para obtener precio y concentración.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 3 — Tokenización</div>
+        <div class="substep-desc">Función <code>tokenize(text)</code>: convierte cada campo de notas a un <code>Set&lt;string&gt;</code> de tokens en minúsculas, dividiendo por comas y espacios. Ejemplo: <code>"Rose, Jasmine, Iris"</code> → <code>{"rose", "jasmine", "iris"}</code>.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 4 — Cálculo de similitud (Jaccard)</div>
+        <div class="substep-desc">
+          Función <code>jaccardSimilarity(A, B) = |A ∩ B| / |A ∪ B|</code>. Se calcula para cada par (producto base, candidato) con pesos ponderados:
+          <table style="margin-top:6px; border:1px solid #d0d7de; border-radius:4px; overflow:hidden;">
+            <tr style="background:#1e5f8a; color:#fff;"><td style="padding:4px 10px; font-weight:600;">Campo</td><td style="padding:4px 10px; font-weight:600;">Peso</td><td style="padding:4px 10px; font-weight:600;">Justificación</td></tr>
+            <tr><td style="padding:4px 10px;"><code>notas_corazon</code></td><td style="padding:4px 10px;">40 %</td><td style="padding:4px 10px;">Corazón del perfume, define su identidad</td></tr>
+            <tr style="background:#f5f8fc;"><td style="padding:4px 10px;"><code>notas_salida</code></td><td style="padding:4px 10px;">30 %</td><td style="padding:4px 10px;">Primera impresión olfativa</td></tr>
+            <tr><td style="padding:4px 10px;"><code>notas_fondo</code></td><td style="padding:4px 10px;">20 %</td><td style="padding:4px 10px;">Persistencia y drydown</td></tr>
+            <tr style="background:#f5f8fc;"><td style="padding:4px 10px;"><code>ingrediente</code></td><td style="padding:4px 10px;">10 %</td><td style="padding:4px 10px;">Composición química secundaria</td></tr>
+          </table>
+        </div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">Paso 5 — Ranking y selección</div>
+        <div class="substep-desc">Los candidatos se ordenan por <code>score</code> descendente. Se devuelven los primeros <code>limit</code> resultados (default 6, máximo 20). El campo <code>score</code> se elimina de la respuesta final.</div>
+      </div>
+      <div class="substep">
+        <div class="substep-label">¿Hay lógica de error?</div>
+        <div class="substep-desc">Validación del parámetro <code>productoId</code> en la API Route (entero positivo). Si el producto no existe → <code>404</code>. No hay lógica de caché ni reintentos; los errores de BD se propagan como <code>500</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PASO 4 -->
+  <div class="step step-4">
+    <div class="step-header">▼ &nbsp;Paso 4 — Salida / Destino</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Qué se produce?</td>
+          <td>Lista JSON de hasta 6 productos recomendados, cada uno con: <code>id_producto</code>, <code>nombre</code>, <code>marca</code>, <code>precio</code>, <code>concentracion</code>, <code>notas_salida</code>, <code>notas_corazon</code>, <code>notas_fondo</code>.</td>
+        </tr>
+        <tr>
+          <td>¿Dónde se guarda?</td>
+          <td>No se persiste. El resultado es efímero: existe únicamente en la respuesta HTTP. No hay caché (cada consulta recalcula en tiempo real).</td>
+        </tr>
+        <tr>
+          <td>¿Quién consume el resultado?</td>
+          <td>El componente de frontend de la página de detalle de producto, que renderiza la sección "Te puede interesar". El usuario final ve las recomendaciones como cards de producto.</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- PASO 5 -->
+  <div class="step step-5">
+    <div class="step-header">▼ &nbsp;Paso 5 — Decisión Arquitectónica</div>
+    <div class="step-body">
+      <table>
+        <tr>
+          <td>¿Por qué este enfoque?</td>
+          <td>Se eligió similitud de Jaccard sobre texto de notas olfativas porque los datos disponibles son descriptivos (no hay historial de compras ni ratings). Es un algoritmo sin estado, determinístico y que aprovecha directamente la información del catálogo cargado por el pipeline ETL. El procesamiento en memoria es viable dado que el catálogo es pequeño (~100 productos). Para el dominio de fragancias, las notas olfativas son el mejor proxy de similitud percibida por el usuario.</td>
+        </tr>
+        <tr>
+          <td>Trade-offs aceptados</td>
+          <td>
+            <ul style="padding-left:16px;">
+              <li><strong>Sin personalización por usuario:</strong> las recomendaciones son iguales para todos los usuarios que consulten el mismo producto. No se considera historial de compras ni preferencias individuales.</li>
+              <li><strong>Sin caché:</strong> cada request recalcula la similitud contra todo el catálogo. Con catálogos grandes (&gt;10 000 productos) esto se volvería un cuello de botella.</li>
+              <li><strong>Calidad ligada a la riqueza de los datos:</strong> si las notas de un perfume están incompletas o mal cargadas, las recomendaciones para ese producto serán de baja calidad.</li>
+            </ul>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+</body>
+</html>

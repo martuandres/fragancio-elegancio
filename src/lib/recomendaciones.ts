@@ -35,7 +35,7 @@ export async function getRecomendaciones(id_producto: number, limit = 6) {
       variante: {
         take: 1,
         orderBy: { ranking: "asc" as const },
-        select: { variante: { select: { precio: true, concentracion: true } } },
+        select: { precio: true, concentracion: true },
       },
     },
   });
@@ -46,7 +46,7 @@ export async function getRecomendaciones(id_producto: number, limit = 6) {
       jaccardSimilarity(tokenize(base.notas_corazon), tokenize(p.notas_corazon)) * 0.4 +
       jaccardSimilarity(tokenize(base.notas_fondo), tokenize(p.notas_fondo)) * 0.2 +
       jaccardSimilarity(tokenize(base.ingrediente), tokenize(p.ingrediente)) * 0.1;
-    const v = p.variante[0]?.variante;
+    const v = p.variante[0];
     return {
       id_producto: p.id_producto,
       nombre: p.nombre,

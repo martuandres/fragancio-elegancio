@@ -70,7 +70,7 @@ export async function POST(req: Request) {
             variante: {
               take: 1,
               orderBy: { ranking: "asc" as const },
-              select: { variante: { select: { precio: true } } },
+              select: { precio: true },
             },
           },
         },
@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     });
 
     const importe_total = items.reduce((sum, item) => {
-      const precio = Number(item.producto.variante[0]?.variante?.precio ?? 0);
+      const precio = Number(item.producto.variante[0]?.precio ?? 0);
       return sum + precio * item.cantidad;
     }, 0);
 

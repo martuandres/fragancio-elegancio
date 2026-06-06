@@ -1,0 +1,103 @@
+CAMBIOS APLICADOS — Corrección Entregable 3
+Grupo 17 — Marketplace de Fragancias
+Fecha: 06/06/2026
+
+========================================================
+MOTIVO
+========================================================
+Se aplicaron las correcciones indicadas por la docente en la
+devolución del Entregable 3 (Modelo Conceptual + Relacional).
+
+========================================================
+CORRECCIÓN 1: Eliminación de tabla intermedia producto_variante_producto
+========================================================
+Problema: La relación Producto → VarianteProducto estaba modelada
+como N:M con una tabla intermedia, cuando conceptualmente es 1:N
+(una variante pertenece a un único producto).
+
+Solución: Se eliminó la tabla intermedia y se agregó id_producto
+como FK directa en variante_producto.
+
+El schema.prisma ya tenía esto correcto. El error estaba en el
+código de aplicación que seguía usando la estructura vieja
+(accesos de tipo `variante[0]?.variante` en lugar de `variante[0]`).
+
+Archivos corregidos:
+- prisma/seed.ts
+    · Eliminado: prisma.productoVarianteProducto.create(...)
+    · Corregido: prisma.varianteProducto.findFirst (nombre de modelo)
+    · Agregado: id_producto directamente en varianteProducto.create
+
+- src/app/(marketplace)/catalogo/page.tsx
+    · SELECT: variante.select.variante.{...} → variante.select.{...}
+    · toProductoBase: p.variante[0]?.variante → p.variante[0]
+    · where filters: variante.some.variante.{...} → variante.some.{...}
+
+- src/app/api/catalogo/route.ts
+    · SELECT: eliminado nivel extra de variante
+    · Mapping: pv.variante.precio → pv.precio
+
+- src/app/api/carrito/route.ts
+    · SELECT: variante.select.variante.{...} → variante.select.{...}
+    · Mapping: variante[0]?.variante → variante[0]
+
+- src/app/api/inventario/route.ts
+    · VARIANTE_SELECT: eliminado nivel extra de variante
+    · Mapping: p.variante[0]?.variante → p.variante[0]
+
+- src/app/api/inventario/[id]/route.ts
+    · resolveProductoDelVendedor: eliminado nivel extra de variante
+    · Mapping: pv.variante.precio → pv.precio
+
+- src/app/api/pagos/webhook/route.ts
+    · SELECT: variante.select.variante.{precio} → variante.select.{precio}
+    · Mapping: variante[0]?.variante?.precio → variante[0]?.precio
+
+- src/lib/recomendaciones.ts
+    · SELECT: variante.select.variante.{...} → variante.select.{...}
+    · Mapping: p.variante[0]?.variante → p.variante[0]
+
+- src/lib/stock.ts
+    · SELECT: variante.select.variante.{precio} → variante.select.{precio}
+    · Mapping: variante[0]?.variante?.precio → variante[0]?.precio
+
+========================================================
+CORRECCIÓN 2: FK de Carrito hacia id_usuario del Comprador (no legajo)
+========================================================
+Problema: El código usaba legajo como identificador del Comprador
+para relacionarlo con Carrito. En la estrategia tabla-por-tipo,
+la PK de Comprador es id_usuario (que actúa también como FK hacia
+Usuario), y Carrito referencia id_usuario. legajo es un atributo
+propio del comprador, no su identificador.
+
+El schema.prisma ya tenía esto correcto (Comprador.@id = id_usuario,
+Carrito.id_usuario como FK). El error estaba en el código que
+resolvía al comprador y filtraba el carrito por legajo.
+
+Archivos corregidos:
+- src/app/api/carrito/route.ts
+    · resolveComprador: select legajo → select id_usuario
+    · getOrCreateCarritoActivo: parámetro legajo → id_usuario
+    · GET/POST/DELETE where: { legajo: ... } → { id_usuario: ... }
+
+- src/app/api/checkout/route.ts
+    · comprador select: legajo → id_usuario
+    · carrito where: { legajo: ... } → { id_usuario: ... }
+
+- src/app/api/pedidos/[id]/route.ts
+    · resolveUsuario: select legajo → select id_usuario
+    · carrito select: legajo → id_usuario
+    · Auth check: carrito.legajo !== usuario.legajo
+                → carrito.id_usuario !== usuario.id_usuario
+
+- src/app/api/envios/[id]/route.ts
+    · resolveUsuario: select legajo → select id_usuario
+    · envio.carrito select: legajo → id_usuario
+    · Auth check: envio.carrito.legajo !== usuario.legajo
+                → envio.carrito.id_usuario !== usuario.id_usuario
+
+========================================================
+RESULTADO
+========================================================
+Build exitoso sin errores de TypeScript tras aplicar todas
+las correcciones.

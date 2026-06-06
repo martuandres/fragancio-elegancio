@@ -51,25 +51,18 @@ async function main() {
     });
 
     // Crear variante con precio/concentración por defecto si no tiene ninguna
-    const yaTieneVariante = await prisma.productoVarianteProducto.findFirst({
+    const yaTieneVariante = await prisma.varianteProducto.findFirst({
       where: { id_producto: producto.id_producto },
     });
 
     if (!yaTieneVariante) {
-      const variante = await prisma.varianteProducto.create({
+      await prisma.varianteProducto.create({
         data: {
+          id_producto:   producto.id_producto,
           volumen:       50,
           precio:        50000,
           concentracion: p.gender?.trim() || null,
-        },
-        select: { id_variante_producto: true },
-      });
-
-      await prisma.productoVarianteProducto.create({
-        data: {
-          id_producto:          producto.id_producto,
-          id_variante_producto: variante.id_variante_producto,
-          ranking:              1,
+          ranking:       1,
         },
       });
     }

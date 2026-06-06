@@ -27,7 +27,7 @@ async function resolveVendedor() {
 const VARIANTE_SELECT = {
   take: 1,
   orderBy: { ranking: "asc" as const },
-  select: { variante: { select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true } } },
+  select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true },
 } as const;
 
 // GET /api/inventario — listar productos del vendedor autenticado (paginado)
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   const productos = raw.map((p) => {
-    const v = p.variante[0]?.variante;
+    const v = p.variante[0];
     return {
       ...p,
       variante: undefined,

@@ -17,19 +17,19 @@ async function resolveComprador() {
 
   return prisma.comprador.findFirst({
     where: { usuario: { email } },
-    select: { legajo: true },
+    select: { id_usuario: true },
   });
 }
 
-async function getOrCreateCarritoActivo(legajo: string) {
+async function getOrCreateCarritoActivo(id_usuario: number) {
   const existing = await prisma.carrito.findFirst({
-    where: { legajo, estado: "activo" },
+    where: { id_usuario, estado: "activo" },
     select: { id_carrito: true },
   });
   if (existing) return existing;
 
   return prisma.carrito.create({
-    data: { legajo, estado: "activo" },
+    data: { id_usuario, estado: "activo" },
     select: { id_carrito: true },
   });
 }
@@ -41,7 +41,7 @@ export async function GET() {
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden acceder al carrito.", 401);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { legajo: comprador.legajo, estado: "activo" },
+    where: { id_usuario: comprador.id_usuario, estado: "activo" },
     select: {
       id_carrito: true,
       fecha_creada: true,
@@ -57,9 +57,7 @@ export async function GET() {
               variante: {
                 take: 1,
                 orderBy: { ranking: "asc" },
-                select: {
-                  variante: { select: { precio: true, concentracion: true } },
-                },
+                select: { precio: true, concentracion: true },
               },
             },
           },
@@ -71,7 +69,7 @@ export async function GET() {
   if (!carrito) return Response.json({ id_carrito: null, items: [], total: 0 });
 
   const items = carrito.items.map((item) => {
-    const v = item.producto.variante[0]?.variante;
+    const v = item.producto.variante[0];
     return {
       cantidad: item.cantidad,
       producto: {
@@ -119,7 +117,7 @@ export async function POST(req: NextRequest) {
       `Stock disponible: ${producto.stock}, solicitado: ${cantidad}`
     );
 
-  const { id_carrito } = await getOrCreateCarritoActivo(comprador.legajo);
+  const { id_carrito } = await getOrCreateCarritoActivo(comprador.id_usuario);
 
   await prisma.carritoProducto.upsert({
     where: { id_carrito_id_producto: { id_carrito, id_producto } },
@@ -143,7 +141,7 @@ export async function DELETE(req: NextRequest) {
     return apiError("ID_INVALIDO", "El campo 'id_producto' debe ser un entero positivo.", 400);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { legajo: comprador.legajo, estado: "activo" },
+    where: { id_usuario: comprador.id_usuario, estado: "activo" },
     select: { id_carrito: true },
   });
   if (!carrito)
