@@ -31,26 +31,8 @@ export async function POST(req: Request) {
     return apiError("FIRMA_INVALIDA", "La firma del webhook es inválida o el payload fue alterado.", 400);
   }
 
-  if (payload.type === "user.created") {
-    const data = payload.data as {
-      email_addresses: { email_address: string }[];
-      first_name?: string | null;
-      last_name?: string | null;
-    };
-
-    const email = data.email_addresses[0]?.email_address;
-    if (!email)
-      return apiError("EMAIL_NO_ENCONTRADO", "El evento no contiene una dirección de email válida.", 400);
-
-    const nombre =
-      [data.first_name, data.last_name].filter(Boolean).join(" ") || email;
-
-    await prisma.usuario.upsert({
-      where: { email },
-      create: { nombre, email, contrasena: "" },
-      update: {},
-    });
-  }
+  // Profile creation (Comprador / Vendedor) is handled in /api/auth/onboarding
+  // after the user selects their role, so there is nothing to do here on user.created.
 
   return Response.json({ ok: true });
 }
