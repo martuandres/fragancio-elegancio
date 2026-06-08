@@ -16,20 +16,20 @@ async function resolveComprador() {
   if (!email) return null;
 
   return prisma.comprador.findFirst({
-    where: { usuario: { email } },
-    select: { id_usuario: true },
+    where: { email },
+    select: { legajo: true },
   });
 }
 
-async function getOrCreateCarritoActivo(id_usuario: number) {
+async function getOrCreateCarritoActivo(legajo: string) {
   const existing = await prisma.carrito.findFirst({
-    where: { id_usuario, estado: "activo" },
+    where: { legajo, estado: "activo" },
     select: { id_carrito: true },
   });
   if (existing) return existing;
 
   return prisma.carrito.create({
-    data: { id_usuario, estado: "activo" },
+    data: { legajo, estado: "activo" },
     select: { id_carrito: true },
   });
 }
@@ -41,7 +41,7 @@ export async function GET() {
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo compradores pueden acceder al carrito.", 401);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: comprador.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: {
       id_carrito: true,
       fecha_creada: true,
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
       `Stock disponible: ${producto.stock}, solicitado: ${cantidad}`
     );
 
-  const { id_carrito } = await getOrCreateCarritoActivo(comprador.id_usuario);
+  const { id_carrito } = await getOrCreateCarritoActivo(comprador.legajo);
 
   await prisma.carritoProducto.upsert({
     where: { id_carrito_id_producto: { id_carrito, id_producto } },
@@ -141,7 +141,7 @@ export async function DELETE(req: NextRequest) {
     return apiError("ID_INVALIDO", "El campo 'id_producto' debe ser un entero positivo.", 400);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: comprador.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: { id_carrito: true },
   });
   if (!carrito)

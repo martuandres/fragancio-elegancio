@@ -20,14 +20,14 @@ export async function POST() {
     return apiError("EMAIL_NO_ENCONTRADO", "No se encontró un email asociado a la cuenta.", 400);
 
   const comprador = await prisma.comprador.findFirst({
-    where: { usuario: { email } },
-    select: { id_usuario: true },
+    where: { email },
+    select: { legajo: true },
   });
   if (!comprador)
     return apiError("USUARIO_NO_ENCONTRADO", "El comprador no existe en el sistema.", 404);
 
   const carrito = await prisma.carrito.findFirst({
-    where: { id_usuario: comprador.id_usuario, estado: "activo" },
+    where: { legajo: comprador.legajo, estado: "activo" },
     select: {
       id_carrito: true,
       items: { select: { id_producto: true, cantidad: true } },

@@ -17,8 +17,8 @@ async function resolveVendedor() {
   if (!email) return null;
 
   const vendedor = await prisma.vendedor.findFirst({
-    where: { usuario: { email } },
-    select: { legajo: true },
+    where: { email },
+    select: { id_vendedor: true },
   });
 
   return vendedor ? { ...vendedor, email } : null;
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
   const skip = (page - 1) * limit;
 
-  const where = { proveedores: { some: { marca: vendedor.legajo } } };
+  const where = { vendedores: { some: { id_vendedor: vendedor.id_vendedor } } };
 
   const [raw, total] = await Promise.all([
     prisma.producto.findMany({
@@ -97,13 +97,6 @@ export async function POST(req: NextRequest) {
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
 
-  // Ensure Proveedor exists for this vendedor (legajo is used as the supplier brand)
-  await prisma.proveedor.upsert({
-    where: { marca: vendedor.legajo },
-    create: { marca: vendedor.legajo, email_contacto: vendedor.email },
-    update: {},
-  });
-
   try {
     const producto = await prisma.producto.create({
       data: {
@@ -115,7 +108,7 @@ export async function POST(req: NextRequest) {
         notas_salida: notas_salida ? String(notas_salida) : null,
         notas_corazon: notas_corazon ? String(notas_corazon) : null,
         notas_fondo: notas_fondo ? String(notas_fondo) : null,
-        proveedores: { create: { marca: vendedor.legajo } },
+        vendedores: { create: { id_vendedor: vendedor.id_vendedor } },
       },
       select: { id_producto: true, nombre: true, marca: true },
     });

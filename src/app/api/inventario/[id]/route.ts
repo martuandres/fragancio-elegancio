@@ -17,18 +17,18 @@ async function resolveVendedor() {
   if (!email) return null;
 
   const vendedor = await prisma.vendedor.findFirst({
-    where: { usuario: { email } },
-    select: { legajo: true },
+    where: { email },
+    select: { id_vendedor: true },
   });
 
   return vendedor ? { ...vendedor, email } : null;
 }
 
-async function resolveProductoDelVendedor(legajo: string, id_producto: number) {
+async function resolveProductoDelVendedor(id_vendedor: number, id_producto: number) {
   return prisma.producto.findFirst({
     where: {
       id_producto,
-      proveedores: { some: { marca: legajo } },
+      vendedores: { some: { id_vendedor } },
     },
     select: {
       id_producto: true,
@@ -62,7 +62,7 @@ export async function GET(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const producto = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
+  const producto = await resolveProductoDelVendedor(vendedor.id_vendedor, id_producto);
 
   if (!producto) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
@@ -99,7 +99,7 @@ export async function PUT(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const existente = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
+  const existente = await resolveProductoDelVendedor(vendedor.id_vendedor, id_producto);
   if (!existente) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
     if (!existe)
@@ -165,7 +165,7 @@ export async function DELETE(
   if (!Number.isInteger(id_producto) || id_producto <= 0)
     return apiError("ID_INVALIDO", "El ID del producto debe ser un entero positivo.", 400);
 
-  const existente = await resolveProductoDelVendedor(vendedor.legajo, id_producto);
+  const existente = await resolveProductoDelVendedor(vendedor.id_vendedor, id_producto);
   if (!existente) {
     const existe = await prisma.producto.findUnique({ where: { id_producto }, select: { id_producto: true } });
     if (!existe)
@@ -173,8 +173,8 @@ export async function DELETE(
     return apiError("ACCESO_DENEGADO", "Este producto no pertenece a tu inventario.", 403);
   }
 
-  await prisma.proveedorProducto.delete({
-    where: { marca_id_producto: { marca: vendedor.legajo, id_producto } },
+  await prisma.vendedorProducto.delete({
+    where: { id_vendedor_id_producto: { id_vendedor: vendedor.id_vendedor, id_producto } },
   });
 
   return new Response(null, { status: 204 });

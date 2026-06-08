@@ -19,29 +19,19 @@ export async function POST(req: NextRequest) {
   if (!email)
     return apiError("EMAIL_NO_ENCONTRADO", "No se encontró un email asociado a la cuenta de Clerk.", 400);
 
-  let usuario = await prisma.usuario.findUnique({ where: { email } });
-  if (!usuario) {
-    const nombre =
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email;
-    usuario = await prisma.usuario.create({
-      data: { nombre, email, contrasena: "" },
-    });
-  }
+  const nombre =
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email;
 
   if (role === "comprador") {
     await prisma.comprador.upsert({
-      where: { id_usuario: usuario.id_usuario },
-      create: { id_usuario: usuario.id_usuario, legajo: `legajo-${usuario.id_usuario}` },
+      where: { email },
+      create: { legajo: `C-${Date.now()}`, email, nombre },
       update: {},
     });
   } else {
     await prisma.vendedor.upsert({
-      where: { id_usuario: usuario.id_usuario },
-      create: {
-        id_usuario: usuario.id_usuario,
-        legajo: `legajo-${usuario.id_usuario}`,
-        cbu: "",
-      },
+      where: { email },
+      create: { email, nombre, cbu: "" },
       update: {},
     });
   }

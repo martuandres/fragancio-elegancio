@@ -16,7 +16,7 @@ async function resolveComprador() {
   if (!email) return null;
 
   return prisma.comprador.findFirst({
-    where: { usuario: { email } },
+    where: { email },
     select: { legajo: true },
   });
 }

@@ -16,11 +16,11 @@ async function resolveUsuario() {
   if (!email) return null;
 
   const comprador = await prisma.comprador.findFirst({
-    where: { usuario: { email } },
-    select: { id_usuario: true },
+    where: { email },
+    select: { legajo: true },
   });
 
-  return { id_usuario: comprador?.id_usuario ?? null, role };
+  return { legajo: comprador?.legajo ?? null, role };
 }
 
 // GET /api/pedidos/[id] — detalle de un pedido (id = id_carrito)
@@ -41,7 +41,7 @@ export async function GET(
     where: { id_carrito },
     select: {
       id_carrito: true,
-      id_usuario: true,
+      legajo: true,
       fecha_creada: true,
       estado: true,
       items: {
@@ -76,7 +76,7 @@ export async function GET(
   if (!carrito)
     return apiError("PEDIDO_NO_ENCONTRADO", `No existe un pedido con id ${id_carrito}.`, 404);
 
-  if (usuario.role === "comprador" && carrito.id_usuario !== usuario.id_usuario)
+  if (usuario.role === "comprador" && carrito.legajo !== usuario.legajo)
     return apiError("ACCESO_DENEGADO", "No tenés permiso para ver este pedido.", 403);
 
   const items = carrito.items.map((item) => {
