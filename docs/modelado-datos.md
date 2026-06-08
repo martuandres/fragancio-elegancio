@@ -7,7 +7,7 @@ y relaciones. No muestra explícitamente cómo se conectan las tablas a nivel de
 
 Este documento es el **modelado de datos lógico**: muestra cada tabla con todas sus columnas,
 incluyendo las claves foráneas (FK) que son las que permiten navegar las relaciones entre tablas.
-Por eso algunos atributos aparecen acá pero no en el E-R (por ejemplo, `id_usuario` en `Carrito`
+Por eso algunos atributos aparecen acá pero no en el E-R (por ejemplo, `legajo` en `Carrito`
 no es un atributo propio del carrito, sino la FK que lo conecta con `Comprador`; o `id_carrito`
 en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen).
 
@@ -17,38 +17,26 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 
 ## Tablas
 
-### usuario
-| Columna      | Tipo    | Rol  |
-|--------------|---------|------|
-| `id_usuario` | —       | PK   |
-| `nombre`     | —       |      |
-| `email`      | —       |      |
-| `contraseña` | —       |      |
-
----
-
 ### Vendedor
-| Columna      | Tipo | Rol                        |
-|--------------|------|----------------------------|
-| `id_usuario` | —    | PK + FK → usuario          |
-| `legajo`     | —    | atributo propio (UNIQUE)   |
-| `saldo`      | —    |                            |
-| `cbu`        | —    |                            |
-| `reputacion` | —    |                            |
-
-> `id_usuario` es al mismo tiempo la PK de Vendedor y la FK que lo conecta con Usuario (estrategia tabla-por-tipo). `legajo` es un atributo propio del vendedor, no su identificador de tabla.
+| Columna        | Tipo | Rol |
+|----------------|------|-----|
+| `id_vendedor`  | —    | PK  |
+| `email`        | —    |     |
+| `nombre`       | —    |     |
+| `saldo`        | —    |     |
+| `cbu`          | —    |     |
+| `reputacion`   | —    |     |
 
 ---
 
 ### Comprador
-| Columna           | Tipo | Rol                        |
-|-------------------|------|----------------------------|
-| `id_usuario`      | —    | PK + FK → usuario          |
-| `legajo`          | —    | atributo propio (UNIQUE)   |
-| `direccion_envio` | —    |                            |
-| `telefono`        | —    |                            |
-
-> `id_usuario` es al mismo tiempo la PK de Comprador y la FK que lo conecta con Usuario (estrategia tabla-por-tipo). `legajo` es un atributo propio del comprador, no su identificador de tabla.
+| Columna           | Tipo | Rol |
+|-------------------|------|-----|
+| `legajo`          | —    | PK  |
+| `email`           | —    |     |
+| `nombre`          | —    |     |
+| `direccion_envio` | —    |     |
+| `telefono`        | —    |     |
 
 ---
 
@@ -100,6 +88,14 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 
 ---
 
+### Vendedor_Producto *(tabla de unión)*
+| Columna        | Tipo | Rol                  |
+|----------------|------|----------------------|
+| `id_vendedor`  | —    | PK + FK → Vendedor   |
+| `id_producto`  | —    | PK + FK → Producto   |
+
+---
+
 ### Producto_Categoria *(tabla de unión)*
 | Columna        | Tipo | Rol                  |
 |----------------|------|----------------------|
@@ -122,9 +118,9 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 | `id_carrito`   | —    | PK                |
 | `estado`       | —    |                   |
 | `fecha_creada` | —    |                   |
-| `id_usuario`   | —    | FK → Comprador    |
+| `legajo`       | —    | FK → Comprador    |
 
-> `id_usuario` no es un atributo propio del carrito: es la FK que lo conecta con el Comprador dueño del carrito. Referencia `id_usuario` (PK de Comprador) y no `legajo` (que es un atributo propio del Comprador, no su identificador de tabla).
+> `legajo` no es un atributo propio del carrito: es la FK que lo conecta con el Comprador dueño del carrito. Referencia `legajo` (PK de Comprador).
 
 ---
 
@@ -173,10 +169,9 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 ## Mapa de conexiones entre tablas
 
 ```
-usuario ◄─── Vendedor   (via id_usuario)
-usuario ◄─── Comprador  (via id_usuario)
-
-Comprador ◄─────────────────── Carrito        (via id_usuario)
+Vendedor  ◄─────────────────── Vendedor_Producto  (via id_vendedor)
+Producto  ◄─────────────────── Vendedor_Producto  (via id_producto)
+Comprador ◄─────────────────── Carrito        (via legajo)
 proveedor ◄─────────────────── Proveedor_Producto (via marca)
 Producto  ◄─────────────────── Proveedor_Producto (via id_producto)
 Producto  ◄─────────────────── Variante_Producto  (via id_producto)

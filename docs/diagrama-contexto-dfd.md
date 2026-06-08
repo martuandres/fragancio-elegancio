@@ -19,6 +19,7 @@ Este es un **Diagrama de Flujo de Datos de Nivel 0 (Diagrama de Contexto)**. Mue
 | Entidad | Rol |
 |---|---|
 | **Comprador** | Usuario final que navega el catálogo, arma su carrito y realiza pedidos. |
+| **Vendedor** | Gestiona el catálogo de productos del marketplace (altas, bajas, modificaciones de stock). Confirma el despacho de las órdenes recibidas. |
 | **Sistema de Envíos** | Servicio externo que recibe los datos del envío, ejecuta la logística y notifica actualizaciones de estado. |
 | **Sistema de Proveeduría** | Proveedor/distribuidor externo que recibe solicitudes de restock y despacha productos al marketplace. |
 | **MercadoPago** | Procesador de pagos externo. Recibe solicitudes de cobro y notifica el resultado vía webhook. |
@@ -35,6 +36,14 @@ Este es un **Diagrama de Flujo de Datos de Nivel 0 (Diagrama de Contexto)**. Mue
 | Marketplace → Comprador | **Detalle de pedido** | El comprador recibe los detalles del pedido (productos, método de pago, monto total, etc.). |
 | Comprador → Marketplace | **Pedido** | El comprador envía la orden de compra final. |
 | Comprador → Marketplace | **Estado de envío** | El comprador consulta el estado actual del envío de su pedido. |
+
+### Vendedor ↔ Marketplace
+
+| Dirección | Flujo | Descripción |
+|---|---|---|
+| Vendedor → Marketplace | **Gestión de inventario** | El vendedor da de alta, modifica o elimina productos y actualiza el stock desde su panel (CU-06). |
+| Marketplace → Vendedor | **Notificación de orden pendiente** | El marketplace informa al vendedor cuando hay un nuevo pedido en estado `preparando` que debe despachar (CU-07). |
+| Vendedor → Marketplace | **Confirmación de despacho** | El vendedor marca el pedido como despachado; el marketplace lo envía al Sistema de Envíos (CU-07). |
 
 ### Marketplace ↔ Sistema de Envíos
 
@@ -67,4 +76,4 @@ Cuando se agregue o modifique funcionalidad, verificar que:
 2. **Integraciones con terceros** (envíos, pagos, proveedores) siempre pasen por el sistema central — ningún actor externo nuevo debe agregarse sin actualizar este diagrama.
 3. **MercadoPago** es una entidad externa explícita — cualquier cambio en el flujo de pagos (nuevo proveedor, nuevo webhook) debe reflejarse en este diagrama.
 4. **Notificaciones por email** (Resend/Nodemailer) son un detalle de implementación interno; no constituyen una entidad externa nueva desde el punto de vista del DFD.
-5. **Vendedor** no aparece como entidad externa porque en el schema actual solo tiene FK a `usuario` (login/registro), igual que el Comprador. Si se implementa el panel del vendedor con flujos propios (gestión de inventario, notificación de pedidos, liquidación de saldo), agregar Vendedor como entidad externa y modelar sus flujos aquí.
+5. **Vendedor** es una entidad externa con flujos propios: gestión de inventario, notificación de pedidos y confirmación de despacho.

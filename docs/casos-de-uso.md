@@ -9,9 +9,8 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 # ENTIDADES Y ATRIBUTOS PRINCIPALES
 
-* **Usuario**: id\_usuario, email, nombre, contraseña
-* **Comprador**: legajo, direccion\_envio, telefono
-* **Vendedor**: legajo, reputación, saldo, cbu
+* **Comprador**: legajo, email, nombre, direccion\_envio, telefono
+* **Vendedor**: id\_vendedor, email, nombre, reputación, saldo, cbu
 * **Producto:** id\_producto, nombre, ingrediente, notas\_salida, notas\_corazon, notas\_fondo, marca, stock
 * **Variante\_Producto**: id\_variante\_producto, volumen, concentración, precio, ranking
 * **Categoria**: id\_categoria, criterio
@@ -23,8 +22,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 # RELACIONES
 
-* **Es un:** Usuario — Vendedor: Todo vendedor es un usuario
-* **Es un:** Usuario — Comprador: Todo comprador es un usuario
+* **Ofrece:** Vendedor (0..\*) — (1..\*) Producto: Un vendedor puede ofrecer cero o más productos; un producto tiene uno o más vendedores. Relación implementada mediante la tabla de unión Vendedor\_Producto.
 * **Ofrece:** Proveedor (0..\*) — (1..\*) Producto: Un proveedor puede ofrecer cero o más productos; un producto tiene uno o más proveedores. Relación implementada mediante la tabla de unión Proveedor\_Producto.
 * **Pertenece:** Producto (1..\*) — Categoría (0..\*): Un producto pertenece a una o más categorías; una categoría puede tener cero o más productos (puede existir sin productos aún asignados).
 * **Tiene:** Producto (1) — (0..\*) Variante\_Producto: Un producto tiene cero o más variantes; una variante pertenece a exactamente un producto.

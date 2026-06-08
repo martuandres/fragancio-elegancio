@@ -7,31 +7,23 @@ datasource db {
   provider = "postgresql"
 }
 
-model Usuario {
-  id_usuario Int        @id @default(autoincrement())
-  nombre     String
-  email      String     @unique
-  contrasena String
-  comprador  Comprador?
-  vendedor   Vendedor?
+model Vendedor {
+  id_vendedor Int                @id @default(autoincrement())
+  email       String             @unique
+  nombre      String
+  saldo       Decimal            @default(0)
+  cbu         String
+  reputacion  Decimal            @default(0)
+  productos   VendedorProducto[]
 }
 
 model Comprador {
-  id_usuario      Int       @id
-  legajo          String    @unique
+  legajo          String    @id
+  email           String    @unique
+  nombre          String
   direccion_envio String?
   telefono        String?
-  usuario         Usuario   @relation(fields: [id_usuario], references: [id_usuario])
   carritos        Carrito[]
-}
-
-model Vendedor {
-  id_usuario Int      @id
-  legajo     String   @unique
-  saldo      Decimal  @default(0)
-  cbu        String
-  reputacion Decimal  @default(0)
-  usuario    Usuario  @relation(fields: [id_usuario], references: [id_usuario])
 }
 
 model Proveedor {
@@ -54,6 +46,7 @@ model Producto {
   variante      VarianteProducto[]
   categorias    ProductoCategoria[]
   proveedores   ProveedorProducto[]
+  vendedores    VendedorProducto[]
   carritoItems  CarritoProducto[]
 
   @@unique([nombre, marca])
@@ -93,12 +86,21 @@ model ProveedorProducto {
   @@id([marca, id_producto])
 }
 
+model VendedorProducto {
+  id_vendedor Int
+  id_producto Int
+  vendedor    Vendedor @relation(fields: [id_vendedor], references: [id_vendedor])
+  producto    Producto @relation(fields: [id_producto], references: [id_producto])
+
+  @@id([id_vendedor, id_producto])
+}
+
 model Carrito {
   id_carrito   Int               @id @default(autoincrement())
-  id_usuario   Int
+  legajo       String
   fecha_creada DateTime          @default(now())
   estado       String            @default("activo")
-  comprador    Comprador         @relation(fields: [id_usuario], references: [id_usuario])
+  comprador    Comprador         @relation(fields: [legajo], references: [legajo])
   items        CarritoProducto[]
   pago         Pago?
   envio        Envio?

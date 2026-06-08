@@ -13,7 +13,7 @@ Un "contenedor" en C4 es cualquier unidad desplegable de forma independiente: un
 | Actor | Descripción |
 |---|---|
 | **Comprador** | Usuario final de la plataforma. Navega el catálogo, arma el carrito, realiza pedidos y recibe notificaciones de pago y envío. |
-| **Vendedor** | Usuario que carga y gestiona los productos del marketplace. Accede al panel de inventario. |
+| **Vendedor** | Usuario que carga y gestiona los productos del marketplace. Accede al panel de inventario y al panel de ventas para ver órdenes pendientes y confirmar despachos. |
 
 Ambos interactúan con el sistema exclusivamente a través de la **Web App** via HTTPS.
 
@@ -82,7 +82,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 
 ### 6. Fragance DB `[Container: SQL]`
 
-**Responsabilidad:** Base de datos principal y única del sistema. Contiene toda la información del marketplace: usuarios, productos, carritos, pagos, facturas y estado de envíos.
+**Responsabilidad:** Base de datos principal y única del sistema. Contiene toda la información del marketplace: compradores, vendedores, productos, carritos, pagos, facturas y estado de envíos.
 
 - Accedida por API Gateway, Servicio Catálogo y Servicio Carrito.
 
@@ -116,6 +116,14 @@ Sistema de Proveeduría → Servicio Catálogo (webhook — notificación de rep
 
 ```
 Vendedor → Web App → API Gateway → Servicio Catálogo
+```
+
+### Flujo de panel de ventas (Vendedor)
+
+```
+Vendedor → Web App → API Gateway → Servicio Carrito
+                                         → Fragance DB (consulta órdenes en estado "preparando")
+                                         → Sistema de Envíos (confirmación de despacho)
 ```
 
 ---

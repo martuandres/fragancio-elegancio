@@ -13,26 +13,22 @@ Es la fuente de verdad conceptual de la estructura de datos.
 
 ## Entidades y atributos
 
-### Usuario *(base de herencia)*
-| Atributo     | Descripción                        |
-|--------------|------------------------------------|
-| `id_usuario` | PK — identificador único           |
-| `nombre`     | Nombre completo                    |
-| `email`      | Correo electrónico                 |
-| `contraseña` | Contraseña (hash, gestionada por Clerk) |
+### Vendedor *(entidad independiente)*
+| Atributo      | Descripción                              |
+|---------------|------------------------------------------|
+| `id_vendedor` | PK — identificador único del vendedor    |
+| `email`       | Email de contacto y autenticación        |
+| `nombre`      | Nombre o razón social                    |
+| `saldo`       | Saldo acumulado por ventas               |
+| `cbu`         | CBU bancario para acreditar ventas       |
+| `reputacion`  | Puntuación de reputación                 |
 
-### Vendedor *(hereda de Usuario vía EsUn)*
-| Atributo     | Descripción                              |
-|--------------|------------------------------------------|
-| `legajo`     | Número de legajo/registro del vendedor   |
-| `saldo`      | Saldo acumulado por ventas               |
-| `cbu`        | CBU bancario para acreditar ventas       |
-| `reputacion` | Puntuación de reputación                 |
-
-### Comprador *(hereda de Usuario vía EsUn)*
+### Comprador *(entidad independiente)*
 | Atributo          | Descripción                                |
 |-------------------|--------------------------------------------|
-| `legajo`          | Número de legajo/registro del comprador    |
+| `legajo`          | PK — número de legajo del comprador        |
+| `email`           | Email de contacto y autenticación          |
+| `nombre`          | Nombre completo                            |
 | `direccion_envio` | Dirección predeterminada de envío          |
 | `telefono`        | Teléfono de contacto                       |
 
@@ -108,15 +104,10 @@ Es la fuente de verdad conceptual de la estructura de datos.
 
 ## Relaciones
 
-### Herencia (EsUn)
-| Relación              | Cardinalidad | Descripción                               |
-|-----------------------|--------------|-------------------------------------------|
-| Usuario **EsUn** Vendedor  | 1:1     | Un usuario puede ser vendedor             |
-| Usuario **EsUn** Comprador | 1:1     | Un usuario puede ser comprador            |
-
 ### Relaciones entre entidades
 | Relación                              | Cardinalidad    | Atributos de relación | Descripción                                      |
 |---------------------------------------|-----------------|-----------------------|--------------------------------------------------|
+| Vendedor **ofrece** Producto  | 0..* a 1..*    | —                     | Un vendedor puede ofrecer cero o más productos; un producto tiene uno o más vendedores  |
 | Proveedor **ofrece** Producto | 0..* a 1..*    | —                     | Un proveedor ofrece 0 o más productos y un Producto tiene uno o mas proveedores        |
 | Producto **tiene** Variante_Producto  | 1 a 0..*        | —                     | Un producto tiene cero o más variantes; una variante pertenece a exactamente un producto |
 | Producto **pertenece** Categoria      | 1..* a 0..*     | —                     | Un producto puede estar en 1 o mas categorías y una categoria puede tener 0 o mas productos |
@@ -131,11 +122,9 @@ Es la fuente de verdad conceptual de la estructura de datos.
 ## Diagrama de cardinalidades resumido
 
 ```
-Usuario ──EsUn──► Vendedor
-        └─EsUn──► Comprador
-
-Proveedor ──0..*── ofrece ──1..*──► Producto ──1── tiene ──0..*──► Variante_Producto
-                                        ▲
+Vendedor  ──0..*── ofrece ──1..*──►
+                                    Producto ──1── tiene ──0..*──► Variante_Producto
+Proveedor ──0..*── ofrece ──1..*──►     ▲
                     Categoria ──1..*── pertenece ──0..*──┘
 
 Comprador ──1── tiene ──0..*──► Carrito ──tiene (cantidad)──0..*──► Producto
