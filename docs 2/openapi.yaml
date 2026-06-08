@@ -585,12 +585,17 @@ paths:
             example:
               nombre: Bleu de Chanel
               marca: Chanel
-              precio: 45000
               stock: 50
-              concentracion: Eau de Parfum
               notas_salida: Lemon, Bergamot, Mint
               notas_corazon: Ginger, Geranium
               notas_fondo: Incense, Vetiver, Musk
+              variantes:
+                - precio: 45000
+                  volumen: 100
+                  concentracion: Eau de Parfum
+                - precio: 35000
+                  volumen: 50
+                  concentracion: Eau de Toilette
       responses:
         '201':
           description: Producto creado exitosamente
@@ -1421,7 +1426,7 @@ components:
     ProductoInput:
       type: object
       description: Body para crear o actualizar un producto en el inventario
-      required: [nombre, marca, precio]
+      required: [nombre, marca, variantes]
       properties:
         nombre:
           type: string
@@ -1429,20 +1434,11 @@ components:
         marca:
           type: string
           example: Chanel
-        precio:
-          type: number
-          format: float
-          minimum: 0
-          example: 45000
         stock:
           type: integer
           minimum: 0
           default: 0
           example: 50
-        concentracion:
-          type: string
-          nullable: true
-          example: Eau de Parfum
         ingrediente:
           type: string
           nullable: true
@@ -1463,6 +1459,30 @@ components:
           type: string
           nullable: true
           example: "Vetiver, Musk"
+        variantes:
+          type: array
+          minItems: 1
+          description: >
+            Lista de variantes del producto. Cada variante es una presentación
+            distinta (volumen / concentración). Se requiere al menos una.
+          items:
+            type: object
+            required: [precio, volumen]
+            properties:
+              precio:
+                type: number
+                format: float
+                minimum: 0
+                example: 45000
+              volumen:
+                type: number
+                format: float
+                description: Volumen en ml
+                example: 100.0
+              concentracion:
+                type: string
+                nullable: true
+                example: Eau de Parfum
 
     Variante:
       type: object
