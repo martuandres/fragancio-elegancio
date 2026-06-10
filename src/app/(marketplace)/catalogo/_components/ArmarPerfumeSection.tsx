@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Droplets, Sparkles, X, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -284,9 +286,20 @@ function ProductoCard({
   producto: ProductoBase;
   coincidencias?: number;
 }) {
+  const router = useRouter();
+  const { isSignedIn, sessionClaims } = useAuth();
+  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
   const [adding, setAdding] = useState(false);
 
   async function handleAgregar() {
+    if (!isSignedIn) {
+      router.push("/sign-in");
+      return;
+    }
+    if (role !== "comprador") {
+      toast.error("Solo los compradores pueden agregar productos al carrito");
+      return;
+    }
     setAdding(true);
     try {
       const res = await fetch("/api/carrito", {
@@ -294,10 +307,10 @@ function ProductoCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id_producto: p.id_producto, cantidad: 1 }),
       });
+      const data = await res.json();
       if (res.ok) {
         toast.success(`${p.nombre} agregado al carrito`);
       } else {
-        const data = await res.json();
         toast.error(data.message ?? "No se pudo agregar al carrito");
       }
     } catch {

@@ -18,12 +18,14 @@ import {
   Store,
 } from "lucide-react";
 import Link from "next/link";
+import { VenderBoton } from "./_components/VenderBoton";
 
 export default async function DashboardPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in");
 
   const firstName = user.firstName ?? user.emailAddresses[0]?.emailAddress ?? "Usuario";
+  const role = (user.publicMetadata as { role?: string } | undefined)?.role;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -133,9 +135,7 @@ export default async function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Link href="/vendedor" className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>
-                  Ir al panel <ArrowRight className="ml-1 size-4" />
-                </Link>
+                <VenderBoton isVendedor={role === "vendedor"} />
               </CardContent>
             </Card>
           </div>
