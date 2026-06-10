@@ -8,7 +8,10 @@
       "Bash(curl -s \"https://perfumapidatabase.onrender.com/perfumes?limit=5\")",
       "Bash(npx tsx --env-file=.env -e ' *)",
       "Bash(npx tsx *)",
-      "Bash(npx shadcn *)"
+      "Bash(npx shadcn *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\pieri\\\\Desktop\\\\Arqui Repo\\\\fragancio-elegancio\" -Recurse -Force | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName | Sort-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\pieri\\\\Desktop\\\\Arqui Repo\\\\fragancio-elegancio\" -Recurse -Exclude \".git\", \"node_modules\", \".next\" | Where-Object { $_.PSIsContainer -eq $false } | Select-Object FullName | Sort-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\pieri\\\\Desktop\\\\Arqui Repo\\\\fragancio-elegancio\" -Depth 3 -Directory | Where-Object { $_.Name -notmatch '^\\(\\\\.git|node_modules|\\\\.next\\)$' } | ForEach-Object { $_ | Select-Object @{N='Path'; E={$_.FullName.Replace\\(\"C:\\\\Users\\\\pieri\\\\Desktop\\\\Arqui Repo\\\\fragancio-elegancio\\\\\", \"\"\\)}} | Format-Table -HideTableHeaders })"
     ]
   }
 }

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Droplets, Sparkles, X } from "lucide-react";
+import { Droplets, Sparkles, X, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -283,6 +284,29 @@ function ProductoCard({
   producto: ProductoBase;
   coincidencias?: number;
 }) {
+  const [adding, setAdding] = useState(false);
+
+  async function handleAgregar() {
+    setAdding(true);
+    try {
+      const res = await fetch("/api/carrito", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_producto: p.id_producto, cantidad: 1 }),
+      });
+      if (res.ok) {
+        toast.success(`${p.nombre} agregado al carrito`);
+      } else {
+        const data = await res.json();
+        toast.error(data.message ?? "No se pudo agregar al carrito");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setAdding(false);
+    }
+  }
+
   return (
     <Card className="card-perfume flex h-full flex-col overflow-hidden hover:shadow-xl">
       {p.imagen_url ? (
@@ -334,7 +358,17 @@ function ProductoCard({
           <NotaBadge label="Fondo"   valor={p.notas_fondo}   className="bg-violet-100 text-violet-800" />
         </div>
 
-        <p className="mt-auto pt-2 text-xs text-muted-foreground">{p.stock} en stock</p>
+        <p className="pt-2 text-xs text-muted-foreground">{p.stock} en stock</p>
+
+        <Button
+          size="sm"
+          className="mt-auto w-full gap-1.5"
+          disabled={p.stock === 0 || adding}
+          onClick={handleAgregar}
+        >
+          <ShoppingCart className="size-3.5" />
+          {p.stock === 0 ? "Sin stock" : adding ? "Agregando…" : "Agregar al carrito"}
+        </Button>
       </CardContent>
     </Card>
   );

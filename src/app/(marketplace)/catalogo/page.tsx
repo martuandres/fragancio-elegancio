@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { prisma } from "@/lib/prisma";
@@ -122,12 +123,12 @@ export default async function CatalogoPage({
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+            <Link href="/carrito" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
               <ShoppingBag className="size-5" />
-            </button>
-            <button className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
+            </Link>
+            <Link href="/dashboard" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
               <User className="size-5" />
-            </button>
+            </Link>
           </div>
         </div>
       </header>
