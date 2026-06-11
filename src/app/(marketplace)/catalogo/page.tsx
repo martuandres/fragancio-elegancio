@@ -115,13 +115,13 @@ export default async function CatalogoPage({
       {/* Navbar */}
       <header className="fixed inset-x-0 top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex h-14 w-full max-w-screen-xl items-center justify-between px-4">
-          <div className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
             <Droplets className="size-6 text-primary" />
             <div className="leading-tight">
               <p className="text-sm font-bold tracking-tight">Fragancio Elegancio</p>
               <p className="text-[10px] text-muted-foreground">Tu marketplace favorito de fragancias</p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-1">
             <Link href="/carrito" className={cn(buttonVariants({ variant: "ghost", size: "icon" }))}>
               <ShoppingBag className="size-5" />

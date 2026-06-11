@@ -1,4 +1,5 @@
 import { currentUser } from "@clerk/nextjs/server";
+import { UserButton } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -27,29 +28,23 @@ export default async function DashboardPage() {
   const firstName = user.firstName ?? user.emailAddresses[0]?.emailAddress ?? "Usuario";
   const role = (user.publicMetadata as { role?: string } | undefined)?.role;
 
+  if (!role) redirect("/onboarding");
+
   return (
     <div className="min-h-screen bg-stone-50">
       {/* Top bar */}
       <header className="border-b bg-white px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <span className="text-lg font-light tracking-[0.2em] uppercase">
             Fragance
           </span>
           <span className="text-lg font-semibold tracking-[0.2em] uppercase">
             Elegancio
           </span>
-        </div>
+        </Link>
         <div className="flex items-center gap-3">
-          {user.imageUrl && (
-            <img
-              src={user.imageUrl}
-              alt={firstName}
-              className="size-8 rounded-full object-cover"
-            />
-          )}
-          <span className="text-sm text-stone-600 hidden sm:block">
-            {firstName}
-          </span>
+          <span className="text-sm text-stone-600 hidden sm:block">{firstName}</span>
+          <UserButton afterSignOutUrl="/sign-in" />
         </div>
       </header>
 
@@ -135,7 +130,7 @@ export default async function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <VenderBoton isVendedor={role === "vendedor"} />
+                <VenderBoton isVendedor={role === "vendedor" || role === "admin"} />
               </CardContent>
             </Card>
           </div>

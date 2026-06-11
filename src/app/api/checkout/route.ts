@@ -5,16 +5,16 @@ import { apiError } from "@/lib/api-error";
 
 // POST /api/checkout — confirmar compra y crear pago pendiente desde el carrito activo
 export async function POST() {
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
   if (!userId)
     return apiError("NO_AUTENTICADO", "Se requiere autenticación para hacer checkout.", 401);
 
-  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
-  if (role !== "comprador")
-    return apiError("ACCESO_DENEGADO", "Solo los compradores pueden realizar el proceso de compra.", 403);
-
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(userId);
+  const role = (clerkUser.publicMetadata as { role?: string } | undefined)?.role;
+  if (role !== "comprador" && role !== "admin")
+    return apiError("ACCESO_DENEGADO", "Solo los compradores pueden realizar el proceso de compra.", 403);
+
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email)
     return apiError("EMAIL_NO_ENCONTRADO", "No se encontró un email asociado a la cuenta.", 400);

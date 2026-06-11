@@ -4,14 +4,14 @@ import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
 
 async function resolveUsuario() {
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
   if (!userId) return null;
-
-  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)
-    ?.role as "comprador" | "vendedor" | undefined;
 
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(userId);
+  const role = (clerkUser.publicMetadata as { role?: string } | undefined)
+    ?.role as "comprador" | "vendedor" | "admin" | undefined;
+
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
@@ -106,7 +106,7 @@ export async function PATCH(
   const usuario = await resolveUsuario();
   if (!usuario)
     return apiError("NO_AUTENTICADO", "Se requiere autenticación para actualizar pedidos.", 401);
-  if (usuario.role !== "vendedor")
+  if (usuario.role !== "vendedor" && usuario.role !== "admin")
     return apiError("ACCESO_DENEGADO", "Solo los vendedores pueden actualizar el estado de los pedidos.", 403);
 
   const { id } = await params;

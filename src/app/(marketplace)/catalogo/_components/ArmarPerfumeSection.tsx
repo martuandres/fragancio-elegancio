@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Droplets, Sparkles, X, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -287,8 +287,9 @@ function ProductoCard({
   coincidencias?: number;
 }) {
   const router = useRouter();
-  const { isSignedIn, sessionClaims } = useAuth();
-  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const role = (user?.publicMetadata as { role?: string } | undefined)?.role;
   const [adding, setAdding] = useState(false);
 
   async function handleAgregar() {
@@ -296,7 +297,7 @@ function ProductoCard({
       router.push("/sign-in");
       return;
     }
-    if (role !== "comprador") {
+    if (role !== "comprador" && role !== "admin") {
       toast.error("Solo los compradores pueden agregar productos al carrito");
       return;
     }

@@ -6,7 +6,8 @@ export default async function OnboardingPage() {
   const { userId, sessionClaims } = await auth();
   if (!userId) redirect("/sign-in");
   const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
-  if (role) redirect("/dashboard");
+  if (role === "comprador") redirect("/catalogo");
+  if (role === "vendedor" || role === "admin") redirect("/dashboard");
 
   return <OnboardingClient />;
 }

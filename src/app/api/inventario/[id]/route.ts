@@ -5,14 +5,14 @@ import { NextRequest } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 
 async function resolveVendedor() {
-  const { userId, sessionClaims } = await auth();
+  const { userId } = await auth();
   if (!userId) return null;
-
-  const role = (sessionClaims?.publicMetadata as { role?: string } | undefined)?.role;
-  if (role !== "vendedor") return null;
 
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(userId);
+  const role = (clerkUser.publicMetadata as { role?: string } | undefined)?.role;
+  if (role !== "vendedor" && role !== "admin") return null;
+
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
