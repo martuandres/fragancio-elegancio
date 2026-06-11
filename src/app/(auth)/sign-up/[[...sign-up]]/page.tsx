@@ -7,7 +7,7 @@ import { ShoppingBag, Store, ArrowRight } from "lucide-react";
 
 type Role = "comprador" | "vendedor";
 
-const roles: { id: Role; label: string; description: string; icon: React.ElementType }[] = [
+const roles: { id: Role; label: string; description: string; icon: React.ElementType; badge?: string }[] = [
   {
     id: "comprador",
     label: "Quiero comprar",

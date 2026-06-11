@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider afterSignOutUrl="/sign-in">
       <html
         lang="es"
         className={cn("h-full", "antialiased", instrumentSans.variable, jetbrainsMono.variable, "font-sans", geist.variable)}

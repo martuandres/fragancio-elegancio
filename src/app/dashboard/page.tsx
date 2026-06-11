@@ -44,7 +44,7 @@ export default async function DashboardPage() {
         </Link>
         <div className="flex items-center gap-3">
           <span className="text-sm text-stone-600 hidden sm:block">{firstName}</span>
-          <UserButton afterSignOutUrl="/sign-in" />
+          <UserButton />
         </div>
       </header>
 
