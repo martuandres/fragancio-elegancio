@@ -139,7 +139,8 @@ export default function SignUpPage() {
               </button>
 
               <SignUp
-                forceRedirectUrl="/dashboard"
+                forceRedirectUrl="/onboarding"
+                signInUrl="/sign-in"
                 appearance={{
                   elements: {
                     rootBox: "w-full",
