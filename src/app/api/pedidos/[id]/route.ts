@@ -15,12 +15,16 @@ async function resolveUsuario() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  const comprador = await prisma.comprador.findFirst({
-    where: { email },
-    select: { legajo: true },
-  });
+  const [comprador, vendedor] = await Promise.all([
+    prisma.comprador.findFirst({ where: { email }, select: { legajo: true } }),
+    prisma.vendedor.findFirst({ where: { email }, select: { id_vendedor: true } }),
+  ]);
 
-  return { legajo: comprador?.legajo ?? null, role };
+  return {
+    legajo: comprador?.legajo ?? null,
+    id_vendedor: vendedor?.id_vendedor ?? null,
+    role,
+  };
 }
 
 // GET /api/pedidos/[id] — detalle de un pedido (id = id_carrito)
@@ -95,10 +99,10 @@ export async function GET(
   return Response.json({ ...carrito, items });
 }
 
-const ESTADOS_VALIDOS = ["enviado", "entregado", "cancelado"] as const;
+const ESTADOS_VALIDOS = ["en_camino", "entregado", "cancelado"] as const;
 type EstadoValido = (typeof ESTADOS_VALIDOS)[number];
 
-// PATCH /api/pedidos/[id] — actualizar estado (solo vendedores)
+// PATCH /api/pedidos/[id] — actualizar estado (solo vendedores dueños de productos del pedido)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -120,17 +124,30 @@ export async function PATCH(
 
   const carrito = await prisma.carrito.findUnique({
     where: { id_carrito },
-    select: { id_carrito: true },
+    select: {
+      id_carrito: true,
+      estado: true,
+      pago: { select: { id_pago: true, estado: true } },
+      envio: { select: { id_envio: true, estado: true } },
+    },
   });
   if (!carrito)
     return apiError("PEDIDO_NO_ENCONTRADO", `No existe un pedido con id ${id_carrito}.`, 404);
 
-  if (estado === "enviado" || estado === "entregado") {
-    const envio = await prisma.envio.findUnique({
-      where: { id_carrito },
-      select: { id_envio: true },
+  if (usuario.role === "vendedor") {
+    const propio = await prisma.carritoProducto.findFirst({
+      where: {
+        id_carrito,
+        producto: { vendedores: { some: { id_vendedor: usuario.id_vendedor ?? -1 } } },
+      },
+      select: { id_producto: true },
     });
-    if (!envio)
+    if (!propio)
+      return apiError("ACCESO_DENEGADO", "El pedido no contiene productos de tu inventario.", 403);
+  }
+
+  if (estado === "en_camino" || estado === "entregado") {
+    if (!carrito.envio)
       return apiError("ENVIO_NO_ENCONTRADO", "No existe un envío asociado a este pedido.", 404);
 
     const actualizado = await prisma.envio.update({
@@ -141,11 +158,38 @@ export async function PATCH(
     return Response.json({ id_carrito, envio: actualizado });
   }
 
-  // cancelado → actualizar estado del carrito
-  const actualizado = await prisma.carrito.update({
-    where: { id_carrito },
-    data: { estado: "cancelado" },
-    select: { id_carrito: true, estado: true },
+  // cancelado → reponer stock y cerrar el pedido
+  if (carrito.estado !== "convertido")
+    return apiError("PEDIDO_NO_CANCELABLE", `El pedido está en estado '${carrito.estado}' y no puede cancelarse.`, 409);
+  if (carrito.envio && carrito.envio.estado !== "preparando")
+    return apiError("PEDIDO_NO_CANCELABLE", "El pedido ya fue despachado y no puede cancelarse.", 409);
+
+  const actualizado = await prisma.$transaction(async (tx) => {
+    // El stock fue decrementado en el checkout; al cancelar se repone (Regla de Negocio 4)
+    const items = await tx.carritoProducto.findMany({
+      where: { id_carrito },
+      select: { id_producto: true, cantidad: true },
+    });
+    for (const item of items) {
+      await tx.producto.update({
+        where: { id_producto: item.id_producto },
+        data: { stock: { increment: item.cantidad } },
+      });
+    }
+
+    if (carrito.pago && carrito.pago.estado !== "rechazado") {
+      await tx.pago.update({
+        where: { id_pago: carrito.pago.id_pago },
+        data: { estado: carrito.pago.estado === "aprobado" ? "reembolsado" : "rechazado" },
+      });
+    }
+
+    return tx.carrito.update({
+      where: { id_carrito },
+      data: { estado: "cancelado" },
+      select: { id_carrito: true, estado: true },
+    });
   });
+
   return Response.json(actualizado);
 }

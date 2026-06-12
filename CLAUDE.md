@@ -77,7 +77,7 @@ npx prisma studio        # Browse DB
 - `Producto` → `VarianteProducto` (1:N) — variants hold `volumen`, `precio`, `concentracion`, `ranking`.
 - `Carrito` → `Pago` (1:0..1, `@unique`); `Carrito` → `Envio` (1:0..1, `@unique`); `Pago` → `Factura` (1:1).
 - Junction tables: `CarritoProducto`, `ProductoCategoria`, `ProveedorProducto`, `VendedorProducto`.
-- `Carrito.estado`: `"activo"` | `"abandonado"` | `"convertido"`.
+- `Carrito.estado`: `"activo"` | `"abandonado"` | `"convertido"` | `"cancelado"` (set on payment rejection or manual cancellation — both restore stock).
 
 ### Checkout atomicity (`lib/stock.ts`)
 
@@ -95,7 +95,7 @@ Weighted Jaccard similarity across tokenized `notas_salida` (30%), `notas_corazo
 
 ### Payment webhook (`/api/pagos/webhook`)
 
-Verifies `X-Webhook-Signature: sha256=<hex>` using `WEBHOOK_SECRET`. Idempotent — skips already-approved payments. On `"aprobado"`: creates `Factura`, creates/updates `Envio` with `estado = "preparando"`. Notifications are fire-and-forget (must not throw on failure).
+Verifies `X-Webhook-Signature: sha256=<hex>` using `WEBHOOK_SECRET` (bare hex also accepted). Idempotent — only `"pendiente"` payments are processed (409 otherwise). On `"aprobado"`: inside one `$transaction`, updates `Pago`, creates `Factura`, upserts `Envio` with `estado = "preparando"`. On `"rechazado"`: inside one `$transaction`, restores stock and sets `Carrito.estado = "cancelado"`. Notifications are fire-and-forget (must not throw on failure).
 
 ## Key environment variables
 

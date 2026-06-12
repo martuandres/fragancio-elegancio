@@ -270,7 +270,7 @@ El proveedor de pagos interpreta un 2xx como "evento procesado correctamente" y 
 | `PAGO_YA_PROCESADO` 409 | El pago ya estaba en `aprobado` | 409 | El proveedor descarta — idempotencia garantizada |
 | Error de DB | Falla de conexión a PostgreSQL | 500 | El proveedor reintentará — escrituras parciales no ocurren (transacción) |
 
-**Idempotencia:** El check `pago.estado === "aprobado"` antes de cualquier escritura garantiza que múltiples envíos del mismo webhook no generen facturas ni envíos duplicados.
+**Idempotencia:** Solo se procesan pagos en estado `pendiente` — el check `pago.estado !== "pendiente"` antes de cualquier escritura devuelve 409 tanto para pagos ya aprobados como ya rechazados, garantizando que múltiples envíos del mismo webhook no generen facturas duplicadas ni repongan stock dos veces.
 
 ---
 
@@ -282,7 +282,7 @@ El proveedor de pagos interpreta un 2xx como "evento procesado correctamente" y 
 |---|---|---|
 | **Webhook vs. polling** | Webhook (push del proveedor) | Polling periódico al proveedor. Se descartó: más costoso, más lento, no escala |
 | **Verificación HMAC vs. IP whitelist** | HMAC-SHA256 con secreto compartido | Whitelist de IPs del proveedor. HMAC es más robusto y no depende de IP fija |
-| **Escrituras directas vs. transacción** | Escrituras secuenciales sin `$transaction` explícito | `prisma.$transaction` unificado. Se descartó para simplificar — el check de idempotencia al inicio protege contra reintentos; si una escritura falla a mitad, el proveedor reintentará y el estado inicial será consistente |
+| **Escrituras directas vs. transacción** | `prisma.$transaction` unificado: actualización del Pago, creación de Factura y upsert de Envío en una sola transacción | Escrituras secuenciales sin transacción. Se descartó: si una escritura fallaba a mitad (Pago ya `aprobado` pero sin Factura), el reintento del proveedor recibía `409 PAGO_YA_PROCESADO` y la Factura no se creaba nunca. Con la transacción, ante falla parcial el Pago queda `pendiente` y el reintento procesa todo completo |
 | **Notificación al comprador** | No implementada en este pipeline (fire-and-forget futuro) | Email inmediato via Resend/Nodemailer. Queda como mejora — su falla no debe bloquear la facturación |
 
 > Ver [ADR-003 — Método de integración con el proveedor de pagos externo](adr/ADR-003-integracion-pagos-webhook.md)  

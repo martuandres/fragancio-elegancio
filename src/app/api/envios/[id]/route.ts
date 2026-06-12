@@ -15,12 +15,16 @@ async function resolveUsuario() {
   const email = clerkUser.emailAddresses[0]?.emailAddress;
   if (!email) return null;
 
-  const comprador = await prisma.comprador.findFirst({
-    where: { email },
-    select: { legajo: true },
-  });
+  const [comprador, vendedor] = await Promise.all([
+    prisma.comprador.findFirst({ where: { email }, select: { legajo: true } }),
+    prisma.vendedor.findFirst({ where: { email }, select: { id_vendedor: true } }),
+  ]);
 
-  return { legajo: comprador?.legajo ?? null, role };
+  return {
+    legajo: comprador?.legajo ?? null,
+    id_vendedor: vendedor?.id_vendedor ?? null,
+    role,
+  };
 }
 
 const ESTADOS_ENVIO = ["preparando", "en_camino", "entregado"] as const;
@@ -85,6 +89,18 @@ export async function PATCH(
   });
   if (!envio)
     return apiError("ENVIO_NO_ENCONTRADO", `No existe un envío asociado al carrito ${id_carrito}.`, 404);
+
+  if (usuario.role === "vendedor") {
+    const propio = await prisma.carritoProducto.findFirst({
+      where: {
+        id_carrito,
+        producto: { vendedores: { some: { id_vendedor: usuario.id_vendedor ?? -1 } } },
+      },
+      select: { id_producto: true },
+    });
+    if (!propio)
+      return apiError("ACCESO_DENEGADO", "El pedido no contiene productos de tu inventario.", 403);
+  }
 
   const body = (await req.json()) as { estado?: string; track_code?: string };
 

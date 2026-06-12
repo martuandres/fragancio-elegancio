@@ -488,9 +488,9 @@ paths:
               properties:
                 estado:
                   type: string
-                  enum: [en_transito, entregado, cancelado]
+                  enum: [en_camino, entregado, cancelado]
                   description: Nuevo estado del envío asociado a la orden
-                  example: en_transito
+                  example: en_camino
       responses:
         '200':
           description: Estado actualizado exitosamente
@@ -504,7 +504,7 @@ paths:
                     example: 7
                   estado:
                     type: string
-                    example: en_transito
+                    example: en_camino
         '400':
           description: Estado inválido
           content:
@@ -514,7 +514,7 @@ paths:
               example:
                 error:
                   code: ESTADO_INVALIDO
-                  message: "El estado debe ser uno de: en_transito, entregado, cancelado."
+                  message: "El estado debe ser uno de: en_camino, entregado, cancelado."
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -913,9 +913,9 @@ paths:
               properties:
                 estado:
                   type: string
-                  enum: [preparando, en_transito, entregado]
+                  enum: [preparando, en_camino, entregado]
                   description: Nuevo estado del envío
-                  example: en_transito
+                  example: en_camino
                 track_code:
                   type: string
                   description: Código de seguimiento del transportista
@@ -936,7 +936,7 @@ paths:
               example:
                 error:
                   code: ESTADO_INVALIDO
-                  message: "El estado del envío debe ser uno de: preparando, en_transito, entregado."
+                  message: "El estado del envío debe ser uno de: preparando, en_camino, entregado."
         '401':
           $ref: '#/components/responses/NoAutenticado'
         '403':
@@ -1575,7 +1575,7 @@ components:
           type: string
           description: >
             Estado derivado que combina Pago.estado (pendiente | aprobado | rechazado)
-            y Envio.estado (preparando | en_transito | entregado).
+            y Envio.estado (preparando | en_camino | entregado).
           example: pendiente
         importe_total:
           type: number
@@ -1667,7 +1667,7 @@ components:
           example: 3
         estado:
           type: string
-          enum: [preparando, en_transito, entregado]
+          enum: [preparando, en_camino, entregado]
           description: Estado actual del envío
           example: preparando
         track_code:
