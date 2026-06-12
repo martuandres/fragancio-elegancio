@@ -71,14 +71,14 @@ Si el tribunal pregunta "explíquenme su ADR-002", hay dos respuestas válidas y
 3. **Asumí Vercel como plataforma en el slide de despliegue** porque los propios ADRs la mencionan repetidamente ("la aplicación puede escalar horizontalmente en Vercel", trade-offs de serverless en ADR-004 de `adrs.md`). Si despliegan en otro lado, la estrategia (inmutable + atomic switch) se mantiene pero hay que ajustar el nombre.
 4. **En las respuestas modelo asumo honestidad total sobre los gaps** (reserva de 5 min, emails, restock). Alternativa descartada: maquillarlos — riesgo altísimo, los lineamientos piden explícitamente justificar las partes no desarrolladas y el tribunal compara doc vs. demo.
 5. **Recomendé video mudo + narración en vivo** en lugar de audio grabado: demuestra dominio ante el tribunal y permite ajustar el ritmo. Es preferencia, no requisito.
-6. **Asumí Grupo 17 y los 5 integrantes del README** como datos de carátula. La comisión quedó `[COMPLETAR]`.
+6. **Asumí Grupo 17 y los 5 integrantes del README** como datos de carátula. La comisión es 17 (ya completada en los slides y el documento de arquitectura).
 
 ---
 
 ## 4. Qué tenés que revisar/completar VOS antes de la entrega
 
 **En los archivos generados (buscar `[COMPLETAR]`):**
-1. `presentacion_slides.md` → número de comisión.
+1. ~~`presentacion_slides.md` → número de comisión.~~ ✔ Completado: Comisión 17.
 2. `prep_preguntas.md` → pregunta de repesca "¿Quién hizo qué?": mapa integrante → aporte.
 3. `checklist_entrega.md` → herramienta de gestión del equipo y división de tareas.
 4. `script_video_demo.md` → emails de las cuentas demo.

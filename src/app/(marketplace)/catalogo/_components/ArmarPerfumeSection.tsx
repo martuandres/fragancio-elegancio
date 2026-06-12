@@ -460,7 +460,7 @@ function ProductoCard({
       if (res.ok) {
         toast.success(`${p.nombre} agregado al carrito`);
       } else {
-        toast.error(data.message ?? "No se pudo agregar al carrito");
+        toast.error(data.error?.message ?? "No se pudo agregar al carrito");
       }
     } catch {
       toast.error("Error de conexión");

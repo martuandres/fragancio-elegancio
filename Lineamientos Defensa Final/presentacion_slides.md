@@ -12,7 +12,7 @@
 
 - **Fragancio Elegancio** — Marketplace Especializado de Fragancias
 - Arquitectura y Diseño de Sistemas · 2026
-- Grupo 17 — Comisión [COMPLETAR]
+- Grupo 17 — Comisión 17
 - Integrantes:
   - Agostino Laurella Crippa
   - Pierino Oscar Spina
