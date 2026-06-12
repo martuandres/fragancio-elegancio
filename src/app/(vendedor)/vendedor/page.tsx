@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Droplets, Plus, Pencil, Trash2, Package, ArrowLeft } from "lucide-react";
+import { Droplets, Plus, Pencil, Trash2, Package, ArrowLeft, ClipboardList, AlertTriangle } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+
+const UMBRAL_CRITICO = 5;
 
 type Producto = {
   id_producto: number;
@@ -72,11 +74,38 @@ export default function VendedorPage() {
           </div>
           <span className="text-sm text-stone-400">{total} productos</span>
         </div>
-        <Link href="/vendedor/inventario/nuevo" className={cn(buttonVariants(), "gap-1.5")}>
-          <Plus className="size-4" />
-          Nuevo producto
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/vendedor/ventas"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <ClipboardList className="size-4" />
+            Órdenes
+          </Link>
+          <Link href="/vendedor/inventario/nuevo" className={cn(buttonVariants(), "gap-1.5")}>
+            <Plus className="size-4" />
+            Nuevo producto
+          </Link>
+        </div>
       </header>
+
+      {/* Banner stock crítico */}
+      {!loading && productos.some((p) => p.stock > 0 && p.stock <= UMBRAL_CRITICO) && (
+        <div className="border-b border-yellow-200 bg-yellow-50 px-6 py-3">
+          <div className="mx-auto flex max-w-4xl items-start gap-2.5">
+            <AlertTriangle className="size-4 text-yellow-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-yellow-800">Stock crítico</p>
+              <p className="text-xs text-yellow-700">
+                {productos
+                  .filter((p) => p.stock > 0 && p.stock <= UMBRAL_CRITICO)
+                  .map((p) => `${p.nombre} (${p.stock} unid.)`)
+                  .join(" · ")}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-4xl px-4 py-8">
         {loading ? (

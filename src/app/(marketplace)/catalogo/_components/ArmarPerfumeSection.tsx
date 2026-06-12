@@ -18,6 +18,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+type RecoItem = {
+  id_producto: number;
+  nombre: string;
+  marca: string;
+  precio: number;
+  concentracion: string | null;
+  notas_salida: string | null;
+  notas_corazon: string | null;
+  notas_fondo: string | null;
+};
+
 export type ProductoBase = {
   id_producto: number;
   nombre: string;
@@ -83,6 +94,56 @@ export function ArmarPerfumeSection({
   const [selCorazon,   setSelCorazon]   = useState<string[]>([]);
   const [selSalida,    setSelSalida]    = useState<string[]>([]);
   const [scored,       setScored]       = useState<ProductoConScore[] | null>(null);
+
+  // Recomendaciones
+  const [recoOpen,     setRecoOpen]     = useState(false);
+  const [recoRef,      setRecoRef]      = useState<ProductoBase | null>(null);
+  const [recoItems,    setRecoItems]    = useState<RecoItem[]>([]);
+  const [recoLoading,  setRecoLoading]  = useState(false);
+  const [addingRecoId, setAddingRecoId] = useState<number | null>(null);
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const router = useRouter();
+  const role = (user?.publicMetadata as { role?: string } | undefined)?.role;
+
+  function handleVerSimilares(id: number) {
+    const ref = allProductos.find((p) => p.id_producto === id) ?? null;
+    setRecoRef(ref);
+    setRecoItems([]);
+    setRecoOpen(true);
+    setRecoLoading(true);
+    fetch(`/api/recomendaciones?productoId=${id}&limit=6`)
+      .then((r) => r.json())
+      .then((d) => setRecoItems(d.data ?? []))
+      .catch(() => toast.error("No se pudieron cargar las recomendaciones"))
+      .finally(() => setRecoLoading(false));
+  }
+
+  async function handleAddReco(item: RecoItem) {
+    if (!isSignedIn) { router.push("/sign-in"); return; }
+    if (role !== "comprador" && role !== "admin") {
+      toast.error("Solo los compradores pueden agregar al carrito");
+      return;
+    }
+    setAddingRecoId(item.id_producto);
+    try {
+      const res = await fetch("/api/carrito", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_producto: item.id_producto, cantidad: 1 }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`${item.nombre} agregado al carrito`);
+      } else {
+        toast.error(data.error?.message ?? "No se pudo agregar al carrito");
+      }
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setAddingRecoId(null);
+    }
+  }
 
   const totalSel   = selFondo.length + selCorazon.length + selSalida.length;
   const modoScore  = scored !== null;
@@ -206,10 +267,95 @@ export function ArmarPerfumeSection({
               key={p.id_producto}
               producto={p}
               coincidencias={"coincidencias" in p ? (p as ProductoConScore).coincidencias : undefined}
+              onVerSimilares={handleVerSimilares}
             />
           ))}
         </div>
       )}
+
+      {/* Sheet de recomendaciones */}
+      <Sheet open={recoOpen} onOpenChange={setRecoOpen}>
+        <SheetContent side="right" className="flex flex-col p-0 sm:max-w-md">
+          <SheetHeader className="border-b px-5 pb-3 pt-5">
+            <SheetTitle>Similares a {recoRef?.nombre ?? "…"}</SheetTitle>
+            {recoRef && (
+              <p className="text-xs text-muted-foreground">
+                {[recoRef.notas_salida, recoRef.notas_corazon, recoRef.notas_fondo]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+          </SheetHeader>
+
+          <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
+            {recoLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="size-6 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+              </div>
+            ) : recoItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <p className="text-4xl mb-3">🌸</p>
+                <p className="text-sm text-muted-foreground">
+                  No encontramos fragancias similares disponibles.
+                </p>
+              </div>
+            ) : (
+              recoItems.map((item) => (
+                <div
+                  key={item.id_producto}
+                  className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        {item.marca}
+                      </p>
+                      <p className="font-medium leading-snug truncate">{item.nombre}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold text-primary">
+                      ${item.precio.toLocaleString("es-AR")}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1">
+                    {item.concentracion && (
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-secondary-foreground">
+                        {item.concentracion}
+                      </span>
+                    )}
+                    {item.notas_salida && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                        {item.notas_salida}
+                      </span>
+                    )}
+                    {item.notas_corazon && (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-800">
+                        {item.notas_corazon}
+                      </span>
+                    )}
+                    {item.notas_fondo && (
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-800">
+                        {item.notas_fondo}
+                      </span>
+                    )}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full gap-1.5"
+                    disabled={addingRecoId === item.id_producto}
+                    onClick={() => handleAddReco(item)}
+                  >
+                    <ShoppingCart className="size-3.5" />
+                    {addingRecoId === item.id_producto ? "Agregando…" : "Agregar al carrito"}
+                  </Button>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
@@ -282,9 +428,11 @@ function NotaSection({
 function ProductoCard({
   producto: p,
   coincidencias,
+  onVerSimilares,
 }: {
   producto: ProductoBase;
   coincidencias?: number;
+  onVerSimilares?: (id: number) => void;
 }) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
@@ -383,6 +531,17 @@ function ProductoCard({
           <ShoppingCart className="size-3.5" />
           {p.stock === 0 ? "Sin stock" : adding ? "Agregando…" : "Agregar al carrito"}
         </Button>
+
+        {onVerSimilares && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-muted-foreground"
+            onClick={() => onVerSimilares(p.id_producto)}
+          >
+            Ver similares
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
