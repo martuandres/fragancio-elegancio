@@ -7,6 +7,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { Droplets, ShoppingBag, User } from "lucide-react";
 import { CategoryPills } from "./_components/CategoryPills";
 import { ArmarPerfumeSection, type ProductoBase } from "./_components/ArmarPerfumeSection";
+import { getBestsellerIds } from "@/lib/bestsellers";
 
 const KEYWORDS: Record<string, string[]> = {
   Floral:    ["Rose", "Jasmine", "Violet", "Iris", "Geranium", "Peony", "Lily", "Tuberose"],
@@ -61,6 +62,18 @@ function extractNotes(
   return [...new Set(all)].sort();
 }
 
+async function getBestsellers(limit = 6): Promise<ProductoBase[]> {
+  const ids = await getBestsellerIds(limit);
+  if (ids.length === 0) return [];
+  const order = new Map(ids.map((id, i) => [id, i]));
+  const raw = await prisma.producto.findMany({
+    where: { id_producto: { in: ids }, stock: { gt: 0 } },
+    select: SELECT,
+  });
+  raw.sort((a, b) => (order.get(a.id_producto) ?? 999) - (order.get(b.id_producto) ?? 999));
+  return raw.map(toProductoBase);
+}
+
 async function getFilteredProductos(q?: string, categoria?: string, genero?: string, concentracion?: string) {
   const keywords = categoria ? KEYWORDS[categoria] : undefined;
 
@@ -100,10 +113,14 @@ export default async function CatalogoPage({
 }) {
   const { q, categoria, genero, concentracion } = await searchParams;
 
+  const hasActiveFilter = !!(q || categoria || genero || concentracion);
+
   const [{ productos, total }, allRaw] = await Promise.all([
     getFilteredProductos(q, categoria, genero, concentracion),
     prisma.producto.findMany({ select: SELECT }),
   ]);
+
+  const sugerencias = total === 0 && hasActiveFilter ? await getBestsellers(6) : [];
 
   const allProductos = allRaw.map(toProductoBase);
   const notasFondo   = extractNotes(allProductos, "notas_fondo");
@@ -171,14 +188,57 @@ export default async function CatalogoPage({
         {/* Sección de productos + drawer Armar tu perfume */}
         <section className="w-full flex-1 py-8">
           <div className="mx-auto w-full max-w-screen-xl px-4">
-            <ArmarPerfumeSection
-              allProductos={allProductos}
-              initialProductos={productos}
-              total={total}
-              notasFondo={notasFondo}
-              notasCorazon={notasCorazon}
-              notasSalida={notasSalida}
-            />
+            {total === 0 && hasActiveFilter ? (
+              <div className="flex flex-col items-center gap-8">
+                <div className="text-center">
+                  <p className="text-lg font-semibold">No encontramos resultados para tu búsqueda.</p>
+                  {sugerencias.length > 0 && (
+                    <p className="mt-1 text-sm text-muted-foreground">Quizás te interese alguno de estos:</p>
+                  )}
+                </div>
+                {sugerencias.length > 0 && (
+                  <div className="w-full grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                    {sugerencias.map((p) => (
+                      <Link
+                        key={p.id_producto}
+                        href={`/catalogo?q=${encodeURIComponent(p.marca)}`}
+                        className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2 hover:border-primary/50 transition-colors"
+                      >
+                        {p.imagen_url ? (
+                          <img
+                            src={p.imagen_url}
+                            alt={p.nombre}
+                            className="w-full aspect-square rounded object-cover"
+                          />
+                        ) : (
+                          <div className="w-full aspect-square rounded bg-muted flex items-center justify-center">
+                            <Droplets className="size-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <p className="text-[11px] text-muted-foreground uppercase tracking-wide truncate">
+                          {p.marca}
+                        </p>
+                        <p className="text-sm font-medium leading-tight line-clamp-2">{p.nombre}</p>
+                        {p.precio > 0 && (
+                          <p className="text-sm font-semibold text-primary mt-auto">
+                            ${p.precio.toFixed(2)}
+                          </p>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <ArmarPerfumeSection
+                allProductos={allProductos}
+                initialProductos={productos}
+                total={total}
+                notasFondo={notasFondo}
+                notasCorazon={notasCorazon}
+                notasSalida={notasSalida}
+              />
+            )}
           </div>
         </section>
       </main>

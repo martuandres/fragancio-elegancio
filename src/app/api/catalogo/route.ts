@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getBestsellerIds } from "@/lib/bestsellers";
 import { NextRequest } from "next/server";
 
 // GET /api/catalogo — listado paginado de productos con stock > 0
@@ -74,6 +75,54 @@ export async function GET(req: NextRequest) {
       volumen: Number(v.volumen),
     })),
   }));
+
+  if (total === 0 && (q || notas)) {
+    const ids = await getBestsellerIds(6);
+    const order = new Map(ids.map((id, i) => [id, i]));
+    const sugRaw = await prisma.producto.findMany({
+      where: { id_producto: { in: ids }, stock: { gt: 0 } },
+      select: {
+        id_producto: true,
+        nombre: true,
+        marca: true,
+        stock: true,
+        imagen_url: true,
+        notas_salida: true,
+        notas_corazon: true,
+        notas_fondo: true,
+        categorias: {
+          select: { categoria: { select: { id_categoria: true, criterio: true } } },
+        },
+        variante: {
+          orderBy: { ranking: "asc" as const },
+          select: { id_variante_producto: true, volumen: true, precio: true, concentracion: true, ranking: true },
+        },
+      },
+    });
+    sugRaw.sort((a, b) => (order.get(a.id_producto) ?? 999) - (order.get(b.id_producto) ?? 999));
+    const sugerencias = sugRaw.map((p) => ({
+      id_producto: p.id_producto,
+      nombre: p.nombre,
+      marca: p.marca,
+      stock: p.stock,
+      imagen_url: p.imagen_url,
+      notas_salida: p.notas_salida,
+      notas_corazon: p.notas_corazon,
+      notas_fondo: p.notas_fondo,
+      categorias: p.categorias.map((c) => c.categoria),
+      variantes: p.variante.map((v) => ({
+        ...v,
+        precio: Number(v.precio),
+        volumen: Number(v.volumen),
+      })),
+    }));
+
+    return Response.json({
+      data: [],
+      pagination: { page, limit, total: 0, totalPages: 0 },
+      sugerencias,
+    });
+  }
 
   return Response.json({
     data: productos,
