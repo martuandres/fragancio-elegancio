@@ -43,12 +43,13 @@ async function main() {
       notas_fondo:   p.notes_base?.join(", ")   || null,
     };
 
-    const producto = await prisma.producto.upsert({
-      where:  { nombre_marca: { nombre, marca } },
-      create: productoPayload,
-      update: productoPayload,
+    const existente = await prisma.producto.findFirst({
+      where: { nombre, marca },
       select: { id_producto: true },
     });
+    const producto = existente
+      ? await prisma.producto.update({ where: { id_producto: existente.id_producto }, data: productoPayload, select: { id_producto: true } })
+      : await prisma.producto.create({ data: productoPayload, select: { id_producto: true } });
 
     // Crear variante con precio/concentración por defecto si no tiene ninguna
     const yaTieneVariante = await prisma.varianteProducto.findFirst({
