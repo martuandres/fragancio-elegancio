@@ -118,8 +118,6 @@ export async function POST(req: NextRequest) {
       headers: { Location: `/api/inventario/${producto.id_producto}` },
     });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")
-      return apiError("PRODUCTO_DUPLICADO", "Ya existe un producto con ese nombre y marca.", 409);
     throw err;
   }
 }

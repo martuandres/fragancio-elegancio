@@ -48,7 +48,6 @@ model Producto {
   vendedores    VendedorProducto[]
   carritoItems  CarritoProducto[]
 
-  @@unique([nombre, marca])
 }
 
 model VarianteProducto {

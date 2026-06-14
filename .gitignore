@@ -45,6 +45,7 @@ next-env.d.ts
 #preguntas y cosas a revisar mias
 preguntas.md
 que-es-un-pipeline.txt
+notas.md
 
 # clerk configuration (can include secrets)
 /.clerk/

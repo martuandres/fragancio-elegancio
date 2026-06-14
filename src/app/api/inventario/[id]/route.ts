@@ -2,7 +2,6 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
-import { Prisma } from "@/generated/prisma/client";
 
 async function resolveVendedor() {
   const { userId } = await auth();
@@ -145,8 +144,6 @@ export async function PUT(
 
     return Response.json(actualizado);
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")
-      return apiError("PRODUCTO_DUPLICADO", "Ya existe otro producto con ese nombre y marca.", 409);
     throw err;
   }
 }
@@ -173,8 +170,50 @@ export async function DELETE(
     return apiError("ACCESO_DENEGADO", "Este producto no pertenece a tu inventario.", 403);
   }
 
-  await prisma.vendedorProducto.delete({
-    where: { id_vendedor_id_producto: { id_vendedor: vendedor.id_vendedor, id_producto } },
+  const otrosVendedores = await prisma.vendedorProducto.count({
+    where: { id_producto, NOT: { id_vendedor: vendedor.id_vendedor } },
+  });
+
+  if (otrosVendedores > 0) {
+    await prisma.vendedorProducto.delete({
+      where: { id_vendedor_id_producto: { id_vendedor: vendedor.id_vendedor, id_producto } },
+    });
+    return new Response(null, { status: 204 });
+  }
+
+  // Es el último vendedor: limpiar carritos sin pago aprobado y borrar el producto
+  await prisma.$transaction(async (tx) => {
+    // Limpiar CarritoProducto de carritos sin pago aprobado
+    await tx.carritoProducto.deleteMany({
+      where: {
+        id_producto,
+        carrito: {
+          pago: { is: null },
+        },
+      },
+    });
+    await tx.carritoProducto.deleteMany({
+      where: {
+        id_producto,
+        carrito: {
+          pago: { estado: { not: "aprobado" } },
+        },
+      },
+    });
+
+    // Si quedan CarritoProducto es porque tienen pago aprobado — preservar historial
+    const conPagoAprobado = await tx.carritoProducto.count({ where: { id_producto } });
+
+    await tx.vendedorProducto.delete({
+      where: { id_vendedor_id_producto: { id_vendedor: vendedor.id_vendedor, id_producto } },
+    });
+
+    if (conPagoAprobado > 0) return; // producto queda huérfano, preserva historial
+
+    await tx.varianteProducto.deleteMany({ where: { id_producto } });
+    await tx.productoCategoria.deleteMany({ where: { id_producto } });
+    await tx.proveedorProducto.deleteMany({ where: { id_producto } });
+    await tx.producto.delete({ where: { id_producto } });
   });
 
   return new Response(null, { status: 204 });
