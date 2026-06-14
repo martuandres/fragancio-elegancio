@@ -156,7 +156,6 @@ X-Webhook-Signature: sha256=3f1a9c...
 - Implementar la **liberación automática de la reserva de 5 minutos** (hoy el decremento es definitivo; requiere campo `reserva_expira` + job de limpieza).
 - Notificaciones por **email reales** (hoy: confirmación en UI; el patrón fire-and-forget ya está diseñado).
 - **Restock automático real** hacia el proveedor (hoy: alerta de stock crítico en el panel; falta la llamada REST saliente y el webhook de reposición).
-- Recálculo automático de **reputación del vendedor** al entregar.
 
 **Partes no desarrolladas — criterio:** priorizamos el **camino crítico de la compra** (catálogo→carrito→checkout→pago→envío) con sus garantías de consistencia, por sobre integraciones salientes que dependen de terceros y no afectan la integridad de los datos.
 

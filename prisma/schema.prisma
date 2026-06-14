@@ -13,7 +13,6 @@ model Vendedor {
   nombre      String
   saldo       Decimal            @default(0)
   cbu         String
-  reputacion  Decimal            @default(0)
   productos   VendedorProducto[]
 }
 

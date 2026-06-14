@@ -25,7 +25,6 @@ en `Pago` y `Envio` que son las FKs que los anclan al carrito que les dio origen
 | `nombre`       | —    |     |
 | `saldo`        | —    |     |
 | `cbu`          | —    |     |
-| `reputacion`   | —    |     |
 
 ---
 

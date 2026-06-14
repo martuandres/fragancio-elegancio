@@ -41,7 +41,6 @@ Si el tribunal pregunta "explíquenme su ADR-002", hay dos respuestas válidas y
 | CU-03 / Regla 4 / Pipeline 3 | Reserva de stock por 5 min con liberación automática | El decremento es definitivo; `RESERVATION_MINUTES` es informativo. No hay job de liberación. |
 | CU-09 / RNF-2 | Email automático al comprador en cada cambio de estado de envío | Toast en la UI del vendedor ("comprador notificado"). No hay servicio de email. |
 | CU-10 / RF-10 | Pedido REST al proveedor + webhook de reposición | Banner de stock crítico en el panel del vendedor. No hay llamada saliente ni webhook entrante. |
-| CU-09 paso 3 / Regla 2 | Recálculo de `reputacion` del vendedor al entregar | No implementado; el campo existe en la tabla. |
 | Pipeline 2 | Pasos del webhook "dentro de una transacción" | El webhook hace escrituras secuenciales (el propio Paso 6 del pipeline lo admite como trade-off — pero la tabla del Paso 5 dice "transacción": redacción interna inconsistente). |
 | `decisiones-disenio.md` | "El panel vendedor no tiene sección de pedidos recibidos" | **Obsoleto**: `/vendedor/ventas` + `GET /api/vendedor/envios` ya existen. Actualizar. |
 

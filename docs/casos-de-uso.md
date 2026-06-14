@@ -10,7 +10,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 # ENTIDADES Y ATRIBUTOS PRINCIPALES
 
 * **Comprador**: legajo, email, nombre, direccion\_envio, telefono
-* **Vendedor**: id\_vendedor, email, nombre, reputación, saldo, cbu
+* **Vendedor**: id\_vendedor, email, nombre, saldo, cbu
 * **Producto:** id\_producto, nombre, ingrediente, notas\_salida, notas\_corazon, notas\_fondo, marca, stock
 * **Variante\_Producto**: id\_variante\_producto, volumen, concentración, precio, ranking
 * **Categoria**: id\_categoria, criterio
@@ -35,10 +35,9 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 ## REGLAS DE NEGOCIO
 
 1. **Validación de Stock:** Un pago no podrá procesarse si no hay stock disponible para alguno de los productos del carrito. El stock debe ser restado de forma automática una vez confirmado el pago. Además deberá ser una operación atómica: dado el caso donde dos compradores intenten comprar el último stock disponible, el sistema procesará al primero y validará el stock antes de que el segundo intente pagar, evitando la sobreventa.
-2. **Reputación del Vendedor:** Se recalcula automáticamente cada vez que un envío pasa a estado "Entregado". El atributo `reputacion` en la entidad Vendedor almacena el valor actualizado.
-3. **Gestión de Carrito:** Los productos en el carrito no reservan stock hasta que se inicia el checkout. La validación de disponibilidad de stock ocurre al momento de iniciar el checkout; si el stock no es suficiente, la operación no avanza.
-4. **Flujo de Pago:** Si el pago falla o es rechazado, el Pago queda en estado `rechazado` y el stock reservado durante el checkout se libera automáticamente. La reserva temporal dura 5 minutos; si el usuario no completa el pago en ese tiempo, se libera sin intervención.
-5. **Restock Automático:** Cuando el stock de un producto cae a niveles críticos, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor correspondiente vía REST/HTTPS. Esta operación es iniciada por el Servicio Catálogo y no requiere intervención del Vendedor.
+2. **Gestión de Carrito:** Los productos en el carrito no reservan stock hasta que se inicia el checkout. La validación de disponibilidad de stock ocurre al momento de iniciar el checkout; si el stock no es suficiente, la operación no avanza.
+3. **Flujo de Pago:** Si el pago falla o es rechazado, el Pago queda en estado `rechazado` y el stock reservado durante el checkout se libera automáticamente. La reserva temporal dura 5 minutos; si el usuario no completa el pago en ese tiempo, se libera sin intervención.
+4. **Restock Automático:** Cuando el stock de un producto cae a niveles críticos, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor correspondiente vía REST/HTTPS. Esta operación es iniciada por el Servicio Catálogo y no requiere intervención del Vendedor.
 
 # REQUERIMIENTOS FUNCIONALES
 
@@ -68,8 +67,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 3. **Integridad de Datos (Transaccionalidad):** El sistema debe asegurar que no se vendan productos sin stock real mediante el uso de transacciones o bloqueos en la base de datos.
 4. **Seguridad:** Toda comunicación entre el Frontend y el Backend debe realizarse sobre HTTPS y las contraseñas deben almacenarse con algoritmos de hashing.
 5. **Latencia:** La búsqueda de productos debe devolver resultados en menos de 500 ms mediante el uso de índices o caché.
-6. **Consistencia Eventual:** Debido a la arquitectura distribuida, la actualización de la reputación del vendedor puede tener una demora de unos minutos respecto a la entrega del producto (Comunicación asíncrona).
-7. **Interoperabilidad:** El sistema debe exponer una API documentada para que el frontend pueda consumir los servicios de forma estándar.
+6. **Interoperabilidad:** El sistema debe exponer una API documentada para que el frontend pueda consumir los servicios de forma estándar.
 
 ## DETALLE DE CASOS DE USO
 
@@ -236,7 +234,6 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 1 | El Sistema de Envíos notifica un cambio de estado (en tránsito, entregado, etc.) | El sistema actualiza el campo `estado` del Envío y registra el `track_code` si aplica |
 |  | 2 |  | El Servicio Notificación dispara el envío de correo al Comprador de forma asíncrona (fire-and-forget) |
-|  | 3 |  | Si el nuevo estado es `entregado`, el sistema recalcula y actualiza el atributo `reputacion` del Vendedor correspondiente (Regla de Negocio 2) |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 2.1 |  | Si el Servicio Notificación falla, se registra el error en el log pero el flujo continúa sin interrupciones |
 | **Rendimiento** | — |  |  |

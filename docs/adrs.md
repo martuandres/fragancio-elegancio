@@ -166,8 +166,6 @@ El sistema interactúa con tres sistemas externos (Sistema de Pagos, Sistema de 
 
 **Motivador 3 — Escalabilidad diferenciada:** El RNF-1 indica que el catálogo puede recibir 10× más tráfico que el checkout. Las respuestas del catálogo son síncronas y deben ser rápidas (< 500 ms — RNF-5); esto no es compatible con intermediar un broker de mensajes en el camino de una búsqueda.
 
-**Motivador 4 — Consistencia eventual aceptable para reputación:** El RNF-6 acepta demora en la actualización de la reputación del vendedor (CU-09, paso 3). Esto indica que no toda escritura necesita ser inmediata.
-
 ### 2. Alternativas consideradas
 
 | Alternativa | Ventaja principal en este contexto | Desventaja / Motivo de descarte |

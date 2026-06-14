@@ -42,7 +42,7 @@ Este archivo registra todas las modificaciones realizadas a los documentos de ar
 | 11 | Relaciones — Posee | **Relación eliminada.** `Posee: Orden de compra — Producto` ya no aplica sin OrdenCompra. Los productos de una compra quedan registrados en `CarritoProducto`. |
 | 12 | Relaciones — Ofrece | **Relación agregada:** `Proveedor (0..*) — (1..*) Producto` vía tabla `Proveedor_Producto`. Existía en el E-R y el schema pero faltaba en este documento. |
 | 13 | Regla de negocio 1 | Reemplazado "orden de compra" por "pago" como entidad central del proceso, alineando con el modelo actual. |
-| 14 | Regla de negocio 2 | Simplificada: eliminada la referencia a "el comprador califica" (mecanismo de calificación no modelado en ningún documento). Se mantiene la lógica de que `reputacion` en Vendedor se actualiza al entregar el pedido. |
+| 14 | Regla de negocio 2 | Eliminada del modelo: el campo `reputacion` se removió del Vendedor dado que ningún caso de uso ni diagrama especifica quién califica ni con qué fórmula. |
 | 15 | Regla de negocio 4 | `"la Orden debe cancelarse"` → `"el Pago queda en estado rechazado"`, alineado con los estados del modelo (`pendiente / aprobado / rechazado / reembolsado`). |
 | 16 | RF 3 — Proceso de Checkout | Eliminada la referencia a "transformar un carrito en una Orden de Compra". Descripción actualizada para reflejar el flujo actual: reserva de stock + pago externo. |
 | 17 | CU-02 y siguientes | El contenido original estaba truncado (artefacto de copy-paste). CU-02 queda marcado como pendiente de completar. |
@@ -86,7 +86,7 @@ Este archivo registra todas las modificaciones realizadas a los documentos de ar
 | 34 | CU-03, comentario | Aclarado que el Servicio Notificación es un componente interno dentro de Lógica de Negocio (Servicio Carrito); no es un contenedor independiente. Consistente con el diagrama de componentes API donde aparece dentro del contenedor Lógica de Negocio. |
 | 35 | CU-09, actores | Actualizada la descripción del Servicio Notificación: `"(interno)"` → `"(componente interno de Lógica de Negocio / Servicio Carrito)"`, alineando con el punto anterior. |
 | 36 | CU-07, paso 2 | Corregido el flujo de despacho: el Vendedor ya no "actualiza el estado a `en tránsito`" directamente. Ahora el sistema envía los datos del despacho al Sistema de Envíos externo, y el estado pasará a `en tránsito` cuando ese sistema lo notifique vía webhook (CU-09). Consistente con el DFD (Sistema de Envíos → Marketplace: "Actualización pedido") y con CU-09 que define al Sistema de Envíos como quien notifica los cambios de estado. |
-| 37 | CU-09, paso 3 (nuevo) | Agregado paso 3: cuando el nuevo estado es `entregado`, el sistema recalcula y actualiza el atributo `reputacion` del Vendedor correspondiente. Cubre la Regla de Negocio 2, que antes no estaba reflejada en ningún caso de uso. |
+| 37 | CU-09, paso 3 | Eliminado paso 3 (recálculo de `reputacion`): la regla de negocio asociada fue removida del modelo junto con el campo. |
 
 ---
 

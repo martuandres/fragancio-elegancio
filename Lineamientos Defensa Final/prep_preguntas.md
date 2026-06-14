@@ -90,7 +90,7 @@
 
 **Apunta a:** Coherencia (el README todavía describe la herencia — posible repregunta).
 
-**Respuesta modelo:** Porque la **identidad ya vive en Clerk** — email, credenciales, sesión y rol están en el proveedor de auth. Una tabla `Usuario` propia duplicaría esa información y habría que sincronizarla. Las tablas `Comprador` (PK `legajo`) y `Vendedor` (PK `id_vendedor`) guardan solo los atributos de negocio que Clerk no modela: dirección de envío y teléfono para uno; saldo, CBU y reputación para el otro. Los roles además son disjuntos en el dominio — no hay flujos donde un usuario actúe como ambos. *(Honestidad si la repreguntan: una versión anterior del README describe herencia `Usuario→Comprador/Vendedor`; el modelo vigente es el del E-R y el schema, con tablas separadas.)*
+**Respuesta modelo:** Porque la **identidad ya vive en Clerk** — email, credenciales, sesión y rol están en el proveedor de auth. Una tabla `Usuario` propia duplicaría esa información y habría que sincronizarla. Las tablas `Comprador` (PK `legajo`) y `Vendedor` (PK `id_vendedor`) guardan solo los atributos de negocio que Clerk no modela: dirección de envío y teléfono para uno; saldo y CBU para el otro. Los roles además son disjuntos en el dominio — no hay flujos donde un usuario actúe como ambos. *(Honestidad si la repreguntan: una versión anterior del README describe herencia `Usuario→Comprador/Vendedor`; el modelo vigente es el del E-R y el schema, con tablas separadas.)*
 
 ---
 
@@ -122,7 +122,7 @@
 
 **Apunta a:** Demo + Calidad de presentación (los lineamientos lo piden explícitamente para el slide 8).
 
-**Respuesta modelo:** Cuatro cosas, con un criterio común: **priorizamos el camino crítico de la compra y sus garantías de consistencia** por sobre integraciones salientes con terceros. (1) La liberación automática de la reserva de 5 minutos — requiere cron externo en serverless; el modo de falla actual es seguro. (2) Emails reales — el patrón fire-and-forget está diseñado y el punto de integración existe; falta el proveedor. (3) El restock automático saliente — hoy el sistema detecta stock crítico y alerta al vendedor en su panel; falta la llamada REST al proveedor y su webhook de reposición, que dependen de un tercero que no existe en el contexto de la materia. (4) El recálculo de reputación del vendedor al entregar. Ninguna de las cuatro compromete la integridad de los datos ni el flujo de compra — y todas tienen su diseño documentado en los casos de uso CU-09 y CU-10.
+**Respuesta modelo:** Tres cosas, con un criterio común: **priorizamos el camino crítico de la compra y sus garantías de consistencia** por sobre integraciones salientes con terceros. (1) La liberación automática de la reserva de 5 minutos — requiere cron externo en serverless; el modo de falla actual es seguro. (2) Emails reales — el patrón fire-and-forget está diseñado y el punto de integración existe; falta el proveedor. (3) El restock automático saliente — hoy el sistema detecta stock crítico y alerta al vendedor en su panel; falta la llamada REST al proveedor y su webhook de reposición, que dependen de un tercero que no existe en el contexto de la materia. Ninguna de las tres compromete la integridad de los datos ni el flujo de compra — y todas tienen su diseño documentado en los casos de uso CU-09 y CU-10.
 
 ---
 

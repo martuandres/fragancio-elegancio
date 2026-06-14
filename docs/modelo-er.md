@@ -21,7 +21,6 @@ Es la fuente de verdad conceptual de la estructura de datos.
 | `nombre`      | Nombre o razón social                    |
 | `saldo`       | Saldo acumulado por ventas               |
 | `cbu`         | CBU bancario para acreditar ventas       |
-| `reputacion`  | Puntuación de reputación                 |
 
 ### Comprador *(entidad independiente)*
 | Atributo          | Descripción                                |
