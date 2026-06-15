@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Droplets, Sparkles, X, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, useUser } from "@clerk/nextjs";
@@ -471,28 +472,34 @@ function ProductoCard({
 
   return (
     <Card className="card-perfume flex h-full flex-col overflow-hidden hover:shadow-xl">
-      {p.imagen_url ? (
-        <div className="relative h-48 w-full shrink-0">
-          <Image
-            src={p.imagen_url}
-            alt={`${p.marca} ${p.nombre}`}
-            fill
-            className="object-cover"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          />
-        </div>
-      ) : (
-        <div className="flex h-48 w-full shrink-0 items-center justify-center bg-muted">
-          <Droplets className="size-10 text-muted-foreground/40" />
-        </div>
-      )}
+      <Link href={`/producto/${p.id_producto}`} className="block shrink-0">
+        {p.imagen_url ? (
+          <div className="relative h-48 w-full">
+            <Image
+              src={p.imagen_url}
+              alt={`${p.marca} ${p.nombre}`}
+              fill
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            />
+          </div>
+        ) : (
+          <div className="flex h-48 w-full items-center justify-center bg-muted">
+            <Droplets className="size-10 text-muted-foreground/40" />
+          </div>
+        )}
+      </Link>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="mb-0.5 text-xs uppercase tracking-wider text-muted-foreground">
               {p.marca}
             </p>
-            <CardTitle className="text-base leading-snug">{p.nombre}</CardTitle>
+            <CardTitle className="text-base leading-snug">
+              <Link href={`/producto/${p.id_producto}`} className="hover:underline">
+                {p.nombre}
+              </Link>
+            </CardTitle>
           </div>
           <span className="shrink-0 whitespace-nowrap text-base font-bold text-primary">
             ${p.precio.toLocaleString("es-AR")}

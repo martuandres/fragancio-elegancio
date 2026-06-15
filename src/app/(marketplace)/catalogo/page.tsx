@@ -201,7 +201,7 @@ export default async function CatalogoPage({
                     {sugerencias.map((p) => (
                       <Link
                         key={p.id_producto}
-                        href={`/catalogo?q=${encodeURIComponent(p.marca)}`}
+                        href={`/producto/${p.id_producto}`}
                         className="rounded-lg border border-border bg-card p-3 flex flex-col gap-2 hover:border-primary/50 transition-colors"
                       >
                         {p.imagen_url ? (
