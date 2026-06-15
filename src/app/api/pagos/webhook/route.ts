@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { enviarEmail } from "@/lib/notificaciones";
 import crypto from "crypto";
 
 const ESTADOS_PAGO = ["aprobado", "rechazado"] as const;
@@ -100,6 +101,19 @@ export async function POST(req: Request) {
 
       return creada;
     });
+
+    prisma.carrito.findUnique({
+      where: { id_carrito },
+      select: { comprador: { select: { email: true, nombre: true } } },
+    }).then((carritoData) => {
+      if (carritoData?.comprador?.email) {
+        enviarEmail(
+          carritoData.comprador.email,
+          "Pago confirmado — Fragancio Elegancio",
+          `Hola ${carritoData.comprador.nombre}, tu pago fue aprobado. Nro. de factura: ${factura.nro_factura}.`
+        ).catch(() => {});
+      }
+    }).catch(() => {});
 
     return Response.json({ ok: true, nro_factura: factura.nro_factura });
   }

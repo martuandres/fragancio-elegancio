@@ -1,12 +1,19 @@
 import { prisma } from "./prisma";
 
-const RESERVATION_MINUTES = 5;
+const STOCK_CRITICO = 5;
 
 export type CartItem = { id_producto: number; cantidad: number };
+
+export type RestockInfo = {
+  nombre: string;
+  nuevoStock: number;
+  emails: string[];
+};
 
 export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
   return prisma.$transaction(async (tx) => {
     let importe_total = 0;
+    const restocks: RestockInfo[] = [];
 
     for (const item of items) {
       const producto = await tx.producto.findUnique({
@@ -19,6 +26,11 @@ export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
             take: 1,
             orderBy: { ranking: "asc" as const },
             select: { precio: true },
+          },
+          proveedores: {
+            select: {
+              proveedor: { select: { email_contacto: true } },
+            },
           },
         },
       });
@@ -35,6 +47,15 @@ export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
         data: { stock: { decrement: item.cantidad } },
       });
 
+      const nuevoStock = producto.stock - item.cantidad;
+      if (nuevoStock <= STOCK_CRITICO && producto.proveedores.length > 0) {
+        restocks.push({
+          nombre: producto.nombre,
+          nuevoStock,
+          emails: producto.proveedores.map((p) => p.proveedor.email_contacto),
+        });
+      }
+
       const precio = Number(producto.variante[0]?.precio ?? 0);
       importe_total += precio * item.cantidad;
     }
@@ -49,6 +70,6 @@ export async function checkoutAtomico(id_carrito: number, items: CartItem[]) {
       data: { estado: "convertido" },
     });
 
-    return { pago, importe_total, reservationMinutes: RESERVATION_MINUTES };
+    return { pago, importe_total, restocks };
   });
 }

@@ -25,7 +25,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 |---|---|---|
 | **Sistema de Pagos** | External Software System | Procesamiento de pagos y facturas (Stripe / MercadoPago). Recibe solicitudes de cobro y responde vía webhook. |
 | **Sistema de Envios** | External Software System | Entrega y seguimiento logístico de los pedidos. Recibe datos del envío y notifica actualizaciones de estado. |
-| **Sistema de Proveeduría** | External Software System | Proveedores/distribuidores de los productos del catálogo. Reciben pedidos de restock vía REST/HTTPS cuando el stock está bajo. Notifican al Servicio Catálogo vía webhook cuando despachan la reposición. |
+| **Sistema de Proveeduría** | External Software System | Proveedores/distribuidores de los productos del catálogo. Reciben pedidos de restock vía email cuando el stock está bajo. El Vendedor actualiza el stock manualmente al recibir la mercadería (CU-06). |
 
 ---
 
@@ -46,7 +46,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 **Responsabilidad:** Enrutamiento y autenticación centralizada.
 
 - Recibe todas las solicitudes de la Web App y las redirige al servicio interno correspondiente.
-- Delega a Servicio Usuarios y Servicio Catálogo, y accede a Fragance DB para verificar datos de usuario.
+- Delega a Servicio Usuarios, Servicio Catálogo y Servicio Carrito. La verificación de autenticación y roles se realiza a través de Servicio Usuarios (Clerk).
 
 ---
 
@@ -60,12 +60,10 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 
 ### 4. Servicio Catálogo `[Node.js]`
 
-**Responsabilidad:** Gestión de productos, búsqueda y filtros.
+**Responsabilidad:** Gestión de productos, búsqueda, filtros y recomendaciones.
 
 - Recibe requests desde el API Gateway.
-- Se comunica con el Servicio Carrito solo cuando el actor es un Comprador realizando una compra.
-- Manda mensajes de restock al Sistema de Proveeduría vía REST/HTTPS.
-- Recibe notificaciones de reposición del Sistema de Proveeduría vía webhook y actualiza `Producto.stock`.
+- Expone el Motor de Recomendación vía `GET /api/recomendaciones`.
 
 ---
 
@@ -73,10 +71,11 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 
 **Responsabilidad:** Funcionalidad de pedidos, pagos y notificaciones.
 
-- Recibe requests del Servicio Catálogo.
+- Recibe requests del API Gateway.
 - Lee y escribe en Fragance DB.
 - Se comunica con el Sistema de Pagos.
 - Se comunica con el Sistema de Envios para despachar pedidos y recibir actualizaciones de estado.
+- Tras decrementar el stock en el checkout, evalúa si el stock cae por debajo del umbral crítico y manda pedidos de restock al Sistema de Proveeduría vía email (fire-and-forget).
 
 ---
 
@@ -84,7 +83,7 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 
 **Responsabilidad:** Base de datos principal y única del sistema. Contiene toda la información del marketplace: compradores, vendedores, productos, carritos, pagos, facturas y estado de envíos.
 
-- Accedida por API Gateway, Servicio Catálogo y Servicio Carrito.
+- Accedida por Servicio Catálogo y Servicio Carrito.
 
 ---
 
@@ -93,10 +92,10 @@ Ambos interactúan con el sistema exclusivamente a través de la **Web App** via
 ### Flujo de compra (Comprador)
 
 ```
-Comprador → Web App → API Gateway → Servicio Catálogo → Servicio Carrito
-                                                          → Fragance DB
-                                                          → Sistema de Pagos → Notificación → Comprador
-                                                          → Sistema de Envios → Notificación → Comprador
+Comprador → Web App → API Gateway → Servicio Carrito
+                                         → Fragance DB
+                                         → Sistema de Pagos → Notificación → Comprador
+                                         → Sistema de Envios → Notificación → Comprador
 ```
 
 ### Flujo de catálogo y búsqueda
@@ -105,11 +104,18 @@ Comprador → Web App → API Gateway → Servicio Catálogo → Servicio Carrit
 Comprador → Web App → API Gateway → Servicio Catálogo
 ```
 
+### Flujo de recomendaciones
+
+```
+Comprador → Web App → API Gateway → Servicio Catálogo (Motor de Recomendación)
+                                         → Fragance DB (consulta productos con stock > 0)
+```
+
 ### Flujo de restock
 
 ```
-Servicio Catálogo → Sistema de Proveeduría (REST/HTTPS — pedido de restock)
-Sistema de Proveeduría → Servicio Catálogo (webhook — notificación de reposición → actualiza Producto.stock)
+Servicio Carrito → Sistema de Proveeduría (email — pedido de restock automático, disparado durante el checkout)
+Vendedor → Web App → API Gateway → Servicio Catálogo (actualización manual de stock al recibir la mercadería — CU-06)
 ```
 
 ### Flujo de gestión de inventario (Vendedor)

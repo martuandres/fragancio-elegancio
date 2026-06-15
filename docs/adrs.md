@@ -148,8 +148,8 @@ El sistema debe almacenar y relacionar múltiples entidades fuertemente vinculad
 > Los casos de uso revelan tres patrones de integración fundamentalmente distintos que coexisten:
 > (1) Flujos síncronos donde el usuario espera respuesta inmediata (CU-01 catálogo, CU-02 carrito,
 > CU-03 inicio de checkout). (2) Flujos asíncronos donde un sistema externo notifica al marketplace
-> después de que el usuario fue redirigido (CU-08 webhook de pago, CU-09 webhook de envíos,
-> CU-10 webhook de reposición de proveedor). (3) Operaciones de soporte que no deben bloquear
+> después de que el usuario fue redirigido (CU-08 webhook de pago, CU-09 webhook de envíos).
+> (3) Operaciones de soporte que no deben bloquear
 > la compra si fallan (CU-09 notificaciones de email — RNF-2).
 > La tensión central es: el checkout necesita ser síncrono para UX, pero la confirmación del pago
 > es inherentemente asíncrona porque el usuario es redirigido a MercadoPago/Stripe.
@@ -179,7 +179,7 @@ El sistema interactúa con tres sistemas externos (Sistema de Pagos, Sistema de 
 **Se decide:** adoptar un **modelo de comunicación híbrido** con tres patrones según el tipo de operación:
 
 1. **REST síncrono** para todas las peticiones iniciadas por el usuario (catálogo, carrito, checkout inicial, inventario, historial). El cliente espera la respuesta antes de continuar.
-2. **Webhooks** para las notificaciones de sistemas externos: el Sistema de Pagos notifica la confirmación o rechazo del pago (`POST /api/pagos/webhook`); el Sistema de Envíos notifica cambios de estado (`POST /api/envios/[id]`); el Sistema de Proveeduría notifica el despacho de reposición de stock (CU-10).
+2. **Webhooks** para las notificaciones de sistemas externos: el Sistema de Pagos notifica la confirmación o rechazo del pago (`POST /api/pagos/webhook`); el Sistema de Envíos notifica cambios de estado (`POST /api/envios/[id]`). El Sistema de Proveeduría no envía webhook: el marketplace le envía un email automático de restock (fire-and-forget, CU-10) y el Vendedor actualiza el stock manualmente al recibir la mercadería (CU-06).
 3. **Fire-and-forget asíncrono** para el Servicio Notificación: el envío de emails se dispara sin esperar confirmación y su falla no revierte ninguna operación de negocio (RNF-2, CU-09).
 
 **Fundamentación:**
@@ -194,7 +194,7 @@ El sistema interactúa con tres sistemas externos (Sistema de Pagos, Sistema de 
 |---|---|
 | El flujo de compra (catálogo → carrito → checkout) tiene baja latencia para el usuario. | Si un webhook de confirmación de pago no llega (el Sistema de Pagos falla su reintento), el Pago queda en estado `pendiente` indefinidamente y el stock permanece decrementado. Se necesita un proceso de conciliación periódica. |
 | La disponibilidad del flujo de compra no depende de la disponibilidad del servicio de email. | Los webhooks requieren validar la autenticidad del request (firma HMAC — implementado en `src/app/api/pagos/webhook/route.ts`) para prevenir falsificaciones. |
-| El restock automático (CU-10) usa el mismo patrón: REST para pedir el restock al proveedor, webhook para recibir la confirmación de despacho, lo que es coherente con el modelo general. | El modelo fire-and-forget no garantiza entrega del email. Si se necesita garantía de entrega, se debe agregar una cola de reintentos (dead-letter queue), lo que acerca este componente al patrón de message broker. |
+| El restock automático (CU-10) usa fire-and-forget: el marketplace envía un email al proveedor y no espera respuesta. El Vendedor actualiza el stock manualmente al recibir la mercadería (CU-06), sin webhook entrante del proveedor. | El modelo fire-and-forget no garantiza entrega del email. Si se necesita garantía de entrega, se debe agregar una cola de reintentos (dead-letter queue), lo que acerca este componente al patrón de message broker. |
 | Decisión relacionada: ADR-001 — dado que los "servicios" son módulos dentro del mismo proceso, la comunicación entre ellos es una llamada de función (no HTTP interno), lo que simplifica la implementación. | |
 
 ---
@@ -210,7 +210,7 @@ El sistema interactúa con tres sistemas externos (Sistema de Pagos, Sistema de 
 > como el backend (API Routes). No existe un servidor separado: todo vive en el mismo artefacto.
 > Esto tiene consecuencias directas sobre el despliegue (un solo pipeline de CI/CD, una sola
 > unidad de escala base) y sobre algunas restricciones técnicas (ej.: el serverless de Vercel
-> impone límites de timeout que afectan la reserva de 5 minutos de stock en CU-03).
+> impone límites de timeout que afectan operaciones de larga duración).
 > La alternativa natural habría sido un frontend React SPA + un backend Express/Fastify separado.
 > El proxy/middleware es `src/proxy.ts` (no `middleware.ts` — renombrado en Next.js 16, según CLAUDE.md).
 > Fuentes: CLAUDE.md (stack, sección Next.js 16 notes), README §5 (stack tecnológico),
@@ -250,7 +250,7 @@ El sistema necesita exponer una interfaz web al usuario y una API que consuma es
 
 | Consecuencias positivas | Trade-offs / costos |
 |---|---|
-| El catálogo puede ser SSR/SSG, reduciendo latencia percibida y mejorando SEO de los productos. | En plataformas serverless (Vercel), las API Routes tienen límites de timeout (generalmente 10-60s según plan). La reserva de 5 minutos de stock del checkout (CU-03) **no puede implementarse como un timer en memoria dentro de una función serverless**: se necesita una solución basada en base de datos (ej.: campo `reservado_hasta TIMESTAMP` en el modelo) o un cron job externo que libere reservas expiradas. |
+| El catálogo puede ser SSR/SSG, reduciendo latencia percibida y mejorando SEO de los productos. | En plataformas serverless (Vercel), las API Routes tienen límites de timeout (generalmente 10-60s según plan). Procesos en background (cron jobs, timers) no pueden correr dentro de una función serverless y requieren un servicio externo. |
 | Un único artefacto y pipeline simplifica el despliegue y la gestión de secretos (DATABASE_URL, CLERK_*, WEBHOOK_SECRET viven en un único contexto de entorno). | El framework Next.js tiene opiniones fuertes sobre la estructura del proyecto (App Router, convención de nombres de archivos). Cambiar de framework en el futuro requeriría una migración significativa. |
 | Los tipos TypeScript del schema Prisma (generados en `src/generated/prisma/`) son accesibles directamente desde los componentes React y las API Routes sin capa de serialización intermedia. | El bundle del servidor incluye dependencias de frontend y backend juntas, lo que puede afectar el cold start en entornos serverless. |
 | Decisión relacionada: ADR-001 — el monolito modular es consecuencia directa de esta elección: Next.js no está diseñado para alojar múltiples servicios independientes, sino para una aplicación cohesiva. | |
@@ -261,85 +261,5 @@ El sistema necesita exponer una interfaz web al usuario y una API que consuma es
 
 - **ADR-001 + ADR-004** son complementarios: la elección de Next.js como framework (ADR-004) es lo que hace posible y natural el monolito modular (ADR-001). Ambas decisiones se refuerzan mutuamente.
 - **ADR-002 + ADR-003** son complementarios: PostgreSQL (ADR-002) es la que hace posible la transacción atómica del checkout, que a su vez requiere que la comunicación interna del checkout sea síncrona y en el mismo proceso (ADR-003, patrón REST/función local).
-- **ADR-003 + ADR-004** tienen una tensión: el patrón fire-and-forget y los webhooks son compatibles con serverless, pero la reserva temporal de stock de 5 minutos **no lo es** sin mecanismos adicionales (ver trade-off de ADR-004).
+- **ADR-003 + ADR-004** son complementarios: el patrón fire-and-forget y los webhooks son compatibles con serverless sin mecanismos adicionales.
 
----
-
-## Inconsistencias de implementación detectadas
-
-> Esta sección no es parte del ADR entregable. Documenta divergencias entre el código implementado
-> y el modelo/especificación documentado, detectadas durante el análisis de los archivos fuente.
-
-### [CRÍTICA] `OrdenCompra` referenciada en el código pero inexistente en el schema Prisma
-
-**Archivos afectados:** `src/lib/stock.ts:51`, `src/app/api/pagos/webhook/route.ts:51,64,98,103`
-
-**Descripción:** La función `checkoutAtomico` en `stock.ts` crea `tx.ordenCompra.create(...)` con campos `id_usuario`, `id_carrito`, `importe_total`, `direccion_envio`, `estado`, `items`. El webhook de pagos usa `prisma.ordenCompra.findUnique(...)` y `prisma.ordenCompra.update(...)`. Sin embargo, el modelo `OrdenCompra` **no existe en `prisma/schema.prisma`**. El schema real sigue el diseño documentado: `Carrito → Pago → Factura` (sin entidad `OrdenCompra` intermedia). Esto provoca que el checkout y el webhook fallen en runtime con un error de Prisma (`Cannot read property 'create' of undefined`).
-
-**Causa probable:** El código fue escrito asumiendo un modelo de datos con `OrdenCompra` separada (con `id_pedido` propio), pero el schema fue definido siguiendo el diseño del README donde el `Carrito` cumple ese rol directamente.
-
-**Corrección necesaria:** Decidir si se adopta `OrdenCompra` como entidad (y agregarla al schema) o se reescribe `stock.ts` y el webhook para usar el flujo `Carrito → Pago` documentado.
-
----
-
-### [CRÍTICA] `checkout/route.ts` consulta `Carrito` por `id_usuario` (campo inexistente)
-
-**Archivo afectado:** `src/app/api/checkout/route.ts:42`
-
-**Descripción:** La query `prisma.carrito.findFirst({ where: { id_usuario: usuario.id_usuario, estado: "activo" } })` usa el campo `id_usuario` sobre el modelo `Carrito`. El schema real define que `Carrito` tiene el campo `legajo` (FK → `Comprador.legajo`), no `id_usuario`. La query fallará en runtime porque `id_usuario` no es un campo del modelo `Carrito`.
-
-**Corrección necesaria:** La query debería recuperar primero el `legajo` del Comprador a partir del `id_usuario`, y luego buscar el carrito por `legajo`. Por ejemplo: buscar `Comprador` donde `id_usuario = usuario.id_usuario`, obtener su `legajo`, y usar ese valor en la query del Carrito.
-
----
-
-### [CRÍTICA] `stock.ts` lee `precio` de `Producto` (campo inexistente en ese modelo)
-
-**Archivo afectado:** `src/lib/stock.ts:40-48`
-
-**Descripción:** El código hace `tx.producto.findMany({ select: { id_producto: true, precio: true } })` y luego usa `p.precio` para calcular el `importe_total`. El campo `precio` **no existe en el modelo `Producto`** del schema: está en `VarianteProducto` (que tiene `precio`, `volumen`, `concentracion`). Esto causaría un error de TypeScript con el cliente Prisma generado.
-
-**Corrección necesaria:** El cálculo del importe debe recuperar el precio desde `VarianteProducto`. Esto implica también que los ítems del carrito deben incluir `id_variante_producto` además de `id_producto`, para saber qué variante (con qué precio) eligió el comprador.
-
----
-
-### [IMPORTANTE] La reserva temporal de 5 minutos no está implementada funcionalmente
-
-**Archivo afectado:** `src/lib/stock.ts:3` (`RESERVATION_MINUTES = 5`)
-
-**Descripción:** La constante `RESERVATION_MINUTES` está declarada pero **nunca se usa** para ninguna lógica funcional. La implementación actual decrementa el stock permanentemente en el momento del checkout (`data: { stock: { decrement: item.cantidad } }`), sin mecanismo de liberación temporal. La especificación (CU-03, Regla de Negocio 4, README §8.2) requiere que:
-
-1. El stock se **reserve** (no descuente permanentemente) por 5 minutos.
-2. Si el pago no se completa en ese tiempo, el stock **se libera automáticamente**.
-
-Esto requiere un campo adicional en el modelo (ej.: `stock_reservado INT` + `reserva_expira TIMESTAMP` en `Producto`, o una tabla `Reserva` separada) y un proceso que libere las reservas expiradas (cron job o verificación en el webhook de rechazo de pago).
-
----
-
-### [IMPORTANTE] `pagos/webhook/route.ts` asume campos y modelos inconsistentes con el schema
-
-**Archivo afectado:** `src/app/api/pagos/webhook/route.ts`
-
-**Descripción:** El webhook asume un modelo de datos diferente al schema real en múltiples lugares:
-
-- `prisma.pago.findUnique({ where: { id_pedido } })` → `Pago` no tiene campo `id_pedido`; tiene `id_carrito`.
-- `prisma.envio.upsert({ where: { id_pedido }, create: { id_pedido, ... } })` → `Envio` no tiene `id_pedido`; tiene `id_carrito`.
-- `prisma.factura.create({ data: { id_pago, id_pedido, importe_total } })` → `Factura` no tiene `id_pedido`; solo tiene `id_pago`.
-- `prisma.envio` incluye `direccion_envio` en el create, pero el modelo `Envio` del schema no tiene ese campo.
-
-Todos estos errores son consecuencia directa de la inconsistencia del punto anterior (OrdenCompra/id_pedido).
-
----
-
-### [MENOR] README §7 muestra `middleware.ts` pero el archivo correcto es `src/proxy.ts`
-
-**Archivo afectado:** `README.md §7`, `src/proxy.ts`
-
-**Descripción:** El README §7 muestra la estructura del proyecto con `middleware.ts` en la raíz. Sin embargo, CLAUDE.md documenta correctamente que en Next.js 16, el archivo de proxy se llama `src/proxy.ts` (no `middleware.ts`). El archivo real en `src/proxy.ts` es correcto y funcional. Solo el README necesita actualizarse para reflejar la estructura real.
-
----
-
-### [TERMINOLOGÍA] README §1 llama "microservicios" a un monolito modular
-
-**Archivo afectado:** `README.md §1`
-
-**Descripción:** El README §1 describe el sistema como "arquitectura de microservicios orientada a la web", pero la implementación real es un monolito modular: todos los servicios son rutas dentro del mismo proceso Next.js, comparten la misma base de datos y se despliegan como un único artefacto. Aunque los ADRs documentan esta decisión correctamente (ADR-001), el README debería actualizar la terminología a "monolito modular con separación interna de servicios" para evitar expectativas incorrectas sobre la capacidad de despliegue independiente por servicio.

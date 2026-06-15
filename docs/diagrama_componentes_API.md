@@ -83,8 +83,7 @@ Gestiona perfiles de usuario, sesiones y asignación de roles (comprador/vendedo
 |---|---|---|
 | **Controlador Catálogo** | Next.js API Route | Maneja las peticiones para navegar categorías y buscar productos |
 | **Gestionar Inventario** | Node.js | Permite al vendedor dar de alta, baja o modificar productos ya existentes |
-| **Servicio Stock REGULAR** | Node.js | Manejo de stock regular de productos |
-| **Motor Recomendación** | Node.js | Calcula recomendaciones basadas en ingredientes y notas de salida, corazón y fondo |
+| **Motor Recomendación** | Node.js | Calcula recomendaciones basadas en ingredientes y notas de salida, corazón y fondo. Aunque pertenece al dominio del catálogo, es invocado desde su propio endpoint (`GET /api/recomendaciones`), no desde el Controlador Catálogo. |
 
 ---
 
@@ -99,6 +98,7 @@ Gestiona perfiles de usuario, sesiones y asignación de roles (comprador/vendedo
 | **Servicio Envio** | Node.js | Mantiene la lógica de seguimiento de estado y entrega de órdenes de compra |
 | **Historial de Pedidos** | Node.js | Muestra todas las órdenes hechas por el usuario, si es que posee alguna |
 | **Servicio de Entrega de Pedidos** | Node.js | Gestiona la comunicación con el Sistema de Envíos para despachar y actualizar el estado de los pedidos |
+| **Controlador Webhook Pagos** | Next.js API Route | Recibe la notificación `POST /api/pagos/webhook` del proveedor de pagos, verifica la firma HMAC-SHA256 y ejecuta la transacción que actualiza el Pago, crea la Factura y da de alta el Envío |
 
 ---
 
@@ -115,11 +115,11 @@ API Gateway
 
 Servicio Catálogo
   ├──► Controlador Catálogo
-  │       └──► Motor Recomendación
+  │       └──► Fragance DB
   ├──► Gestionar Inventario
   │       └──► Fragance DB
-  └──► Servicio Stock REGULAR
-         └──► Proveedores de perfumes
+  └──► Motor Recomendación
+          └──► Fragance DB
 
 Lógica de Negocio
   ├──► Servicio Carrito
@@ -127,14 +127,18 @@ Lógica de Negocio
   ├──► Controlador Checkout
   │       ├──► Servicio Stock ATOMICIDAD
   │       │       └──► Fragance DB
-  │       └──► Sistema de Pagos
-  │              ├──► Servicio Notificación  (async — fire-and-forget)
-  │              └──► Servicio Envio
-  │                     └──► Sistema de Envios
+  │       ├──► Proveedores de perfumes  (restock vía email — fire-and-forget, si stock cae bajo umbral crítico; datos de restock devueltos por Servicio Stock ATOMICIDAD)
+  │       └──► Sistema de Pagos  (redirige al comprador para completar el pago externamente)
+  ├──► Controlador Webhook Pagos
+  │       ├──► Fragance DB  (actualiza Pago, crea Factura, da de alta Envío — dentro de una transacción)
+  │       └──► Servicio Notificación  (async — fire-and-forget)
   ├──► Historial de Pedidos
   │       └──► Fragance DB
   └──► Servicio de Entrega de Pedidos
          └──► Sistema de Envios
+
+Sistema de Pagos
+  └──► Controlador Webhook Pagos  (POST /api/pagos/webhook — notificación asíncrona del resultado del pago)
 
 Sistema de Envios
   └──► Servicio de Entrega de Pedidos  (notificación de actualización de estado)

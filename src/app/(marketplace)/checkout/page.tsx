@@ -25,7 +25,6 @@ type PagoResult = {
   id_carrito: number;
   importe_total: number;
   estado: string;
-  reservacion_minutos: number;
 };
 
 export default function CheckoutPage() {

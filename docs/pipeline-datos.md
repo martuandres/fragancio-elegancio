@@ -44,9 +44,9 @@ El sistema tiene **tres pipelines identificados**, cada uno con un propósito de
 | Campo | Detalle |
 |---|---|
 | **Sistema fuente** | Base de datos PostgreSQL — Fragance DB |
-| **Entidades involucradas** | Tabla `Producto` |
-| **Campos leídos** | `id_producto`, `nombre`, `marca`, `precio`, `concentracion`, `notas_salida`, `notas_corazon`, `notas_fondo`, `ingrediente` |
-| **Filtro aplicado en origen** | `WHERE id_producto != :base AND stock > 0` — excluye el producto base y los sin stock |
+| **Entidades involucradas** | Tablas `Producto`, `VarianteProducto`, `Pago`, `CarritoProducto` |
+| **Campos leídos** | De `Producto`: `id_producto`, `nombre`, `marca`, `notas_salida`, `notas_corazon`, `notas_fondo`, `ingrediente`. De `VarianteProducto` (variante principal, ordenada por `ranking`): `precio`, `concentracion`. De `Pago` (historial del comprador, solo si está autenticado como comprador): `id_carrito`, filtrado por `estado = "aprobado"` y `carrito.legajo`. De `CarritoProducto`: `id_producto` para recuperar las notas olfativas de los productos comprados. |
+| **Filtro aplicado en origen** | Candidatos: `WHERE id_producto != :base AND stock > 0`. Historial (opcional, si el usuario es comprador autenticado): `Pago WHERE estado = "aprobado" AND carrito.legajo = :legajo`. |
 | **Volumen estimado** | Catálogo de 100–500 productos activos por consulta |
 | **Frecuencia** | Por request (on-demand); estimado 50–200 consultas diarias en etapa inicial |
 | **Tecnología de acceso** | Prisma ORM → `prisma.producto.findUnique()` + `prisma.producto.findMany()` |
@@ -102,11 +102,21 @@ Jaccard(A, B) = |A ∩ B| / |A ∪ B|
 | `ingrediente` | 10% | Complementario — muchos perfumes comparten materiales genéricos |
 
 ```
-score = jaccard(corazon_base, corazon_candidato) × 0.4
-      + jaccard(salida_base,  salida_candidato)  × 0.3
-      + jaccard(fondo_base,   fondo_candidato)   × 0.2
-      + jaccard(ingr_base,    ingr_candidato)    × 0.1
+score_base = jaccard(corazon_base, corazon_candidato) × 0.4
+           + jaccard(salida_base,  salida_candidato)  × 0.3
+           + jaccard(fondo_base,   fondo_candidato)   × 0.2
+           + jaccard(ingr_base,    ingr_candidato)    × 0.1
 ```
+
+**3c.2. Blend con historial de compras del usuario (cuando existe)**
+
+Si el comprador tiene historial de compras aprobadas, el motor construye un perfil agregando todas las notas e ingredientes de los productos comprados en un único `Set` por campo (`notas_salida`, `notas_corazon`, `notas_fondo`, `ingrediente`). El score final combina la similitud respecto al producto base con la similitud respecto al perfil del historial:
+
+```
+score_final = score_base × 0.6 + score_historial × 0.4
+```
+
+Donde `score_historial` se calcula con la misma fórmula de Jaccard ponderada pero usando el perfil acumulado del comprador como referencia. Si el comprador no tiene historial, `score_final = score_base`.
 
 **3d. Ordenamiento y truncado**
 
@@ -124,7 +134,7 @@ score = jaccard(corazon_base, corazon_candidato) × 0.4
 |---|---|
 | **Destino** | Respuesta HTTP al cliente — no se escribe en base de datos |
 | **Formato de salida** | JSON: `{ data: ProductoRecomendado[], total: number }` |
-| **Campos devueltos por producto** | `id_producto`, `nombre`, `marca`, `precio`, `concentracion`, `notas_salida`, `notas_corazon`, `notas_fondo` |
+| **Campos devueltos por producto** | `id_producto`, `nombre`, `marca`, `notas_salida`, `notas_corazon`, `notas_fondo` (de `Producto`); `precio`, `concentracion` (de `VarianteProducto`, variante principal) |
 | **Persistencia** | Ninguna — el resultado es efímero (stateless) |
 | **Consumidor** | Frontend del catálogo — sección "Perfumes similares" en la página de detalle de producto |
 
@@ -139,7 +149,7 @@ score = jaccard(corazon_base, corazon_candidato) × 0.4
 | `PARAM_REQUERIDO` 400 | `productoId` ausente en la query | `{ error: { code, message } }` |
 | `ID_INVALIDO` 400 | `productoId` no es entero positivo | `{ error: { code, message } }` |
 | `PRODUCTO_NO_ENCONTRADO` 404 | El producto base no existe en DB | `{ error: { code, message } }` |
-| Sin resultados (vacío) | No hay productos con similitud > 0 | 200 con `data: [], total: 0` — no es error |
+| Sin similitud suficiente | Ningún producto supera el umbral de similitud (score < 0.1) | 200 con los productos más vendidos como fallback (`data: bestsellers[], total: N`) — no es error |
 | Error de DB | Falla de conexión a PostgreSQL | 500 propagado por Next.js |
 
 **Estrategia de resiliencia:** El endpoint es de solo lectura y no tiene efectos secundarios. Si falla, el comprador puede seguir navegando el catálogo sin ver recomendaciones — no bloquea ningún flujo de compra.
@@ -283,7 +293,7 @@ El proveedor de pagos interpreta un 2xx como "evento procesado correctamente" y 
 | **Webhook vs. polling** | Webhook (push del proveedor) | Polling periódico al proveedor. Se descartó: más costoso, más lento, no escala |
 | **Verificación HMAC vs. IP whitelist** | HMAC-SHA256 con secreto compartido | Whitelist de IPs del proveedor. HMAC es más robusto y no depende de IP fija |
 | **Escrituras directas vs. transacción** | `prisma.$transaction` unificado: actualización del Pago, creación de Factura y upsert de Envío en una sola transacción | Escrituras secuenciales sin transacción. Se descartó: si una escritura fallaba a mitad (Pago ya `aprobado` pero sin Factura), el reintento del proveedor recibía `409 PAGO_YA_PROCESADO` y la Factura no se creaba nunca. Con la transacción, ante falla parcial el Pago queda `pendiente` y el reintento procesa todo completo |
-| **Notificación al comprador** | No implementada en este pipeline (fire-and-forget futuro) | Email inmediato via Resend/Nodemailer. Queda como mejora — su falla no debe bloquear la facturación |
+| **Notificación al comprador** | Implementada como fire-and-forget: tras crear la Factura, `pagos/webhook/route.ts` consulta el email del Comprador y llama a `enviarEmail` (Nodemailer) sin `await`. Su falla no revierte la transacción ni bloquea la respuesta al proveedor. | Email síncrono bloqueante. Descartado: si el servidor de email no responde, el webhook devuelve error y el proveedor reintenta, generando facturas duplicadas |
 
 > Ver [ADR-003 — Método de integración con el proveedor de pagos externo](adr/ADR-003-integracion-pagos-webhook.md)  
 > Ver [ADR-004 — Motor de base de datos para la persistencia del sistema](adr/ADR-004-base-de-datos-postgresql.md)
@@ -320,7 +330,7 @@ El proveedor de pagos interpreta un 2xx como "evento procesado correctamente" y 
 | **Entidades leídas** | `Carrito`, `CarritoProducto`, `Producto` |
 | **Condición del carrito** | `estado = "activo"` y `legajo = :compradorActual` |
 | **Campos leídos del carrito** | `id_carrito`, `items[].id_producto`, `items[].cantidad` |
-| **Campos leídos del producto** | `id_producto`, `nombre`, `precio`, `stock` |
+| **Campos leídos del producto** | De `Producto`: `id_producto`, `nombre`, `stock`. De `VarianteProducto` (variante principal, ordenada por `ranking`): `precio` |
 | **Validación previa a la transacción** | (1) Usuario autenticado con rol `comprador`; (2) Carrito activo existe; (3) Carrito no está vacío |
 | **Frecuencia** | Por intención de compra — estimado 5–30 checkouts diarios en etapa inicial |
 
@@ -396,7 +406,7 @@ Esto previene que el mismo carrito genere múltiples pagos — la constraint `@u
 | **Tabla `Pago`** | Creación | INSERT | `id_pago`, `id_carrito`, `estado = "pendiente"` |
 | **Tabla `Producto`** | Actualización | UPDATE × N ítems | `stock` decrementado |
 | **Tabla `Carrito`** | Actualización | UPDATE | `estado = "convertido"` |
-| **Respuesta HTTP** | 201 Created | `{ id_pago, id_carrito, importe_total, estado: "pendiente", reservacion_minutos: 5 }` + header `Location: /api/checkout/{id_pago}` |
+| **Respuesta HTTP** | 201 Created | `{ id_pago, id_carrito, importe_total, estado: "pendiente" }` + header `Location: /api/pedidos/{id_carrito}` |
 
 ---
 
@@ -424,10 +434,9 @@ Esto previene que el mismo carrito genere múltiples pagos — la constraint `@u
 | Trade-off | Decisión | Alternativa descartada |
 |---|---|---|
 | **Transacción de DB vs. reserva en memoria** | `prisma.$transaction` sobre PostgreSQL | Mutex en memoria / Redis lock. Se descartó: un mutex en Node.js no funciona en múltiples instancias del servidor; Redis añade complejidad innecesaria |
-| **Reserva temporal de 5 minutos vs. compra definitiva** | El stock se decrementa definitivamente al confirmar el checkout (no al iniciar el pago) | Reserva temporal con expiración automática. La reserva temporal requiere un job de limpieza (cron) que complica la infraestructura — el decremento definitivo es más simple dado que el pago se espera inmediato |
+| **Decremento permanente vs. reserva temporal** | El stock se decrementa definitivamente al confirmar el checkout. Si el pago es rechazado, el stock se restaura vía webhook | Una reserva temporal con expiración automática requeriría un cron job externo o campo `reservado_hasta` en el modelo — complejidad que no justifica el beneficio dado que el pago externo responde de forma inmediata vía webhook |
 | **Precio en respuesta vs. precio persistido** | El `importe_total` se calcula durante el checkout y se retorna al cliente; se persiste en `Factura` al confirmar el pago (Pipeline 2) | Guardar precio en un campo de `Pago`. Se descartó para evitar denormalización — `Factura` ya captura el importe final cuando el pago se confirma |
 | **Loop secuencial vs. paralelo para validar stock** | Secuencial dentro de la transacción | Paralelo con `Promise.all`. El paralelo puede generar deadlocks en PostgreSQL por bloqueos de fila — el secuencial es más predecible |
-| **Reserva de 5 minutos documentada** | Comunicado al cliente en la respuesta (`reservacion_minutos: 5`) | No informar. Se decidió informar al comprador para que sepa que debe completar el pago pronto |
 
 > Ver [ADR-001 — Mecanismo de garantía de atomicidad en el proceso de checkout](adr/ADR-001-atomicidad-checkout.md)  
 > Ver [ADR-004 — Motor de base de datos para la persistencia del sistema](adr/ADR-004-base-de-datos-postgresql.md)

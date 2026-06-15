@@ -46,6 +46,7 @@ next-env.d.ts
 preguntas.md
 que-es-un-pipeline.txt
 notas.md
+diagramas-a-corregir.md
 
 # clerk configuration (can include secrets)
 /.clerk/

@@ -97,7 +97,7 @@ Es la fuente de verdad conceptual de la estructura de datos.
 |-------------|----------------------------------------------------|
 | `id_envio`  | PK — identificador único                           |
 | `track_code`| Código de seguimiento del proveedor logístico      |
-| `estado`    | Estado (preparando / en tránsito / entregado / devuelto) |
+| `estado`    | Estado (preparando / en tránsito / entregado) |
 
 ---
 

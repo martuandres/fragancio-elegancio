@@ -16,7 +16,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 * **Categoria**: id\_categoria, criterio
 * **Carrito:** id\_carrito, estado, fecha\_creada
 * **Pago:** id\_pago, estado
-* **Factura:** nro\_factura, importe\_total, fecha\_emision
+* **Factura:** id\_pago, nro\_factura, importe\_total, fecha\_emision
 * **Envío:** id\_envío, estado, track\_code
 * **Proveedor:** marca, email\_contacto, teléfono
 
@@ -34,10 +34,10 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 ## REGLAS DE NEGOCIO
 
-1. **Validación de Stock:** Un pago no podrá procesarse si no hay stock disponible para alguno de los productos del carrito. El stock debe ser restado de forma automática una vez confirmado el pago. Además deberá ser una operación atómica: dado el caso donde dos compradores intenten comprar el último stock disponible, el sistema procesará al primero y validará el stock antes de que el segundo intente pagar, evitando la sobreventa.
+1. **Validación de Stock:** Un pago no podrá procesarse si no hay stock disponible para alguno de los productos del carrito. El stock se descuenta de forma automática al momento del checkout, dentro de una transacción atómica, antes de la confirmación del pago. Dado el caso donde dos compradores intenten comprar el último stock disponible, el sistema procesará al primero y validará el stock antes de que el segundo intente pagar, evitando la sobreventa.
 2. **Gestión de Carrito:** Los productos en el carrito no reservan stock hasta que se inicia el checkout. La validación de disponibilidad de stock ocurre al momento de iniciar el checkout; si el stock no es suficiente, la operación no avanza.
-3. **Flujo de Pago:** Si el pago falla o es rechazado, el Pago queda en estado `rechazado` y el stock reservado durante el checkout se libera automáticamente. La reserva temporal dura 5 minutos; si el usuario no completa el pago en ese tiempo, se libera sin intervención.
-4. **Restock Automático:** Cuando el stock de un producto cae a niveles críticos, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor correspondiente vía REST/HTTPS. Esta operación es iniciada por el Servicio Catálogo y no requiere intervención del Vendedor.
+3. **Flujo de Pago:** Si el pago falla o es rechazado, el Pago queda en estado `rechazado` y el stock decrementado durante el checkout se restaura automáticamente. No existe un mecanismo de expiración por tiempo — el stock solo se libera ante un rechazo de pago explícito notificado vía webhook.
+4. **Restock Automático:** Cuando el stock de un producto cae a niveles críticos, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor correspondiente vía email. Esta operación es iniciada por el Servicio Carrito y no requiere intervención del Vendedor. El Vendedor actualiza el stock manualmente al recibir la mercadería (CU-06).
 
 # REQUERIMIENTOS FUNCIONALES
 
@@ -47,7 +47,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 2. **Gestión de Carrito:** El usuario debe poder agregar, quitar y modificar cantidades de productos en un carrito de compras.
 3. **Proceso de Checkout:** El sistema debe permitir iniciar el proceso de compra desde el carrito, reservando el stock, solicitando datos de envío y procesando el pago a través del sistema externo.
 4. **Historial de Pedidos:** El usuario debe poder visualizar el estado de sus compras pasadas y actuales (Pendiente, Enviado, Entregado).
-5. **Recomendaciones de Productos:** El sistema debe sugerir fragancias al comprador basándose en similitudes de notas olfativas (salida, corazón, fondo) e ingredientes de productos previamente vistos o comprados.
+5. **Recomendaciones de Productos:** El sistema debe sugerir fragancias al comprador basándose en similitudes de notas olfativas (salida, corazón, fondo) e ingredientes de productos previamente comprados.
 
 ## Para el Vendedor:
 
@@ -56,7 +56,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 ## Para el Sistema (Automáticos):
 
-8. **Sincronización de Stock:** El sistema debe descontar automáticamente las unidades del inventario una vez que el pago es confirmado.
+8. **Sincronización de Stock:** El sistema debe descontar automáticamente las unidades del inventario al momento del checkout, dentro de una transacción atómica, antes de la confirmación del pago.
 9. **Notificaciones de Estado:** El sistema debe enviar un correo automático al comprador cuando el estado de su envío cambie. Si el servicio de notificaciones falla, la compra no debe verse afectada.
 10. **Restock Automático:** El sistema debe detectar cuando el stock de un producto cae a nivel crítico y enviar un pedido de reabastecimiento al proveedor externo correspondiente de forma automática.
 
@@ -113,18 +113,17 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 | **Descripción** | El Comprador inicia el proceso de compra desde su carrito: el sistema valida el stock, reserva los productos, genera el Pago y redirige al Sistema de Pagos externo. |  |  |
 | **Actores** | Comprador, Sistema de Pagos (externo) |  |  |
 | **Pre Condiciones** | El Comprador debe haber iniciado sesión. El carrito debe contener al menos un producto. |  |  |
-| **Post Condiciones** | Se crea un Pago con estado `pendiente` vinculado al Carrito. El stock queda reservado por 5 minutos. Si el pago es confirmado: se genera Factura y Envío con estado `preparando`. |  |  |
+| **Post Condiciones** | Se crea un Pago con estado `pendiente` vinculado al Carrito. El stock queda decrementado. Si el pago es confirmado: se genera Factura y Envío con estado `preparando`. Si el pago es rechazado: el stock se restaura. |  |  |
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 1 | El Comprador confirma el carrito e inicia el checkout | El Servicio Stock ATOMICIDAD valida que haya stock real para cada producto dentro de una transacción atómica |
-|  | 2 |  | El sistema reserva el stock por 5 minutos y crea el Pago con estado `pendiente` |
+|  | 2 |  | El sistema decrementa el stock y crea el Pago con estado `pendiente` |
 |  | 3 |  | El sistema redirige al Comprador al Sistema de Pagos externo (MercadoPago) |
 |  | 4 | El Comprador completa el pago en el Sistema de Pagos externo | El Sistema de Pagos notifica el resultado al marketplace vía webhook |
 |  | 5 |  | El sistema actualiza el Pago a estado `aprobado`, genera la Factura y crea el Envío con estado `preparando` |
 |  | 6 |  | El Servicio Notificación envía un correo de confirmación al Comprador de forma asíncrona |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 1.1 |  | Si el stock no es suficiente para algún producto, el sistema cancela el checkout e informa al Comprador |
-|  | 2.1 |  | Si el Comprador no completa el pago en 5 minutos, el sistema libera automáticamente el stock reservado |
-|  | 4.1 | El pago es rechazado por el Sistema de Pagos | El sistema actualiza el Pago a estado `rechazado` y libera el stock reservado |
+|  | 4.1 | El pago es rechazado por el Sistema de Pagos | El sistema actualiza el Pago a estado `rechazado` y restaura el stock decrementado durante el checkout |
 | **Rendimiento** | La reserva de stock debe completarse en menos de 2 segundos |  |  |
 | **Frecuencia** | Media |  |  |
 | **Importancia** | Vital |  |  |
@@ -151,12 +150,12 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 | CU-05 | Recomendaciones de Productos |  |  |
 | :---: | :---: | :---: | :---: |
-| **Descripción** | El sistema sugiere fragancias al Comprador calculando similitudes basadas en el historial de compras y productos visitados, usando notas olfativas e ingredientes como atributos de comparación. |  |  |
+| **Descripción** | El sistema sugiere fragancias al Comprador calculando similitudes basadas en el historial de compras, usando notas olfativas e ingredientes como atributos de comparación. |  |  |
 | **Actores** | Comprador |  |  |
 | **Pre Condiciones** | El Comprador debe haber iniciado sesión. El sistema debe tener productos cargados con atributos de notas olfativas. |  |  |
 | **Post Condiciones** | El sistema devuelve una lista de productos recomendados personalizada, ordenada por índice de coincidencia. |  |  |
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
-|  | 1 | El Comprador accede a la sección de recomendaciones o visualiza el detalle de un producto | El Motor de Recomendación recupera el historial de compras y productos visitados del Comprador, junto con los atributos del producto de referencia actual (`notas_salida`, `notas_corazon`, `notas_fondo`, `ingrediente`) |
+|  | 1 | El Comprador accede a la sección de recomendaciones o visualiza el detalle de un producto | El Motor de Recomendación recupera el historial de compras del Comprador, junto con los atributos del producto de referencia actual (`notas_salida`, `notas_corazon`, `notas_fondo`, `ingrediente`) |
 |  | 2 |  | El motor calcula un índice de coincidencia contra el resto de los productos del catálogo, ponderando por historial |
 |  | 3 |  | El sistema devuelve la lista de productos recomendados personalizada, ordenada por mayor similitud |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
@@ -206,19 +205,19 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 | CU-08 | Sincronización de Stock (Sistema Automático) |  |  |
 | :---: | :---: | :---: | :---: |
-| **Descripción** | Al confirmarse un pago, el sistema descuenta automáticamente el stock de los productos comprados, genera la Factura y crea el Envío. |  |  |
+| **Descripción** | Al confirmarse un pago, el sistema genera la Factura y crea el Envío. El stock ya fue decrementado al momento del checkout (CU-03). |  |  |
 | **Actores** | Sistema de Pagos (externo, vía webhook) |  |  |
-| **Pre Condiciones** | Debe existir un Pago en estado `pendiente` con stock reservado. El Sistema de Pagos envía la confirmación vía webhook. |  |  |
-| **Post Condiciones** | Stock decrementado. Pago en estado `aprobado`. Factura creada. Envío creado con estado `preparando`. |  |  |
+| **Pre Condiciones** | Debe existir un Pago en estado `pendiente` con stock ya decrementado durante el checkout. El Sistema de Pagos envía la confirmación vía webhook. |  |  |
+| **Post Condiciones** | Pago en estado `aprobado`. Factura creada. Envío creado con estado `preparando`. (El stock ya estaba decrementado desde el checkout — CU-03.) |  |  |
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 1 | El Sistema de Pagos envía el webhook de confirmación | El sistema valida la autenticidad del webhook |
 |  | 2 |  | El sistema actualiza el Pago a estado `aprobado` |
-|  | 3 |  | El sistema descuenta de `Producto.stock` la cantidad correspondiente a cada ítem, consultando la cantidad registrada en CarritoProducto |
+|  | 3 |  | El stock ya fue decrementado al momento del checkout (CU-03); el sistema no realiza ningún ajuste adicional sobre el stock |
 |  | 4 |  | El sistema genera la Factura vinculada al Pago |
 |  | 5 |  | El sistema crea el Envío con estado `preparando` vinculado al Carrito |
 |  | 6 |  | El Servicio Notificación envía un correo de confirmación al Comprador de forma asíncrona (fire-and-forget) |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
-|  | 1.1 | El webhook indica pago rechazado | El sistema actualiza el Pago a estado `rechazado` y libera el stock reservado |
+|  | 1.1 | El webhook indica pago rechazado | El sistema actualiza el Pago a estado `rechazado`, restaura el stock decrementado durante el checkout (incrementa `Producto.stock` por cada ítem del carrito) y pasa el Carrito a estado `cancelado`. Todo dentro de una única transacción. |
 | **Rendimiento** | — |  |  |
 | **Frecuencia** | Media |  |  |
 | **Importancia** | Vital |  |  |
@@ -244,20 +243,20 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 
 | CU-10 | Restock Automático (Sistema Automático) |  |  |
 | :---: | :---: | :---: | :---: |
-| **Descripción** | Cuando el stock de un producto cae a nivel crítico, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor externo correspondiente. Cuando el Proveedor confirma el despacho vía webhook, el sistema actualiza `Producto.stock` automáticamente. |  |  |
-| **Actores** | Servicio Catálogo (interno), Sistema de Proveeduría (externo) |  |  |
-| **Pre Condiciones** | El stock de un Producto cae por debajo del umbral crítico (como consecuencia de una compra confirmada en CU-08). |  |  |
-| **Post Condiciones** | El Proveedor recibe el pedido de restock vía REST/HTTPS. Al confirmar el despacho, `Producto.stock` queda actualizado con la cantidad repuesta. |  |  |
+| **Descripción** | Cuando el stock de un producto cae a nivel crítico, el sistema envía automáticamente un pedido de reabastecimiento al Proveedor externo correspondiente vía email. Al recibir la mercadería, el Vendedor actualiza el stock manualmente desde su panel (CU-06). |  |  |
+| **Actores** | Servicio Carrito (interno, vía checkout), Sistema de Proveeduría (externo), Vendedor |  |  |
+| **Pre Condiciones** | El stock de un Producto cae por debajo del umbral crítico (como consecuencia del checkout iniciado en CU-03). El Producto debe tener al menos un Proveedor asociado en la tabla Proveedor\_Producto. |  |  |
+| **Post Condiciones** | El Proveedor recibe un email automático con el pedido de restock. Al llegar la mercadería, el Vendedor actualiza `Producto.stock` sumando las unidades recibidas vía CU-06. |  |  |
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
-|  | 1 |  | Tras decrementar el stock (CU-08), el Servicio Catálogo evalúa si el stock resultante es menor o igual al umbral crítico |
-|  | 2 |  | Si la condición se cumple, el Servicio Catálogo envía un pedido de restock al Sistema de Proveeduría (Proveedor correspondiente según la relación Proveedor\_Producto) vía REST/HTTPS |
-|  | 3 | El Sistema de Proveeduría recibe el pedido y prepara el despacho | — |
-|  | 4 | El Sistema de Proveeduría notifica al marketplace vía webhook con la cantidad de unidades despachadas | El Servicio Catálogo recibe la notificación y actualiza `Producto.stock` sumando la cantidad repuesta |
+|  | 1 |  | Tras decrementar el stock en el checkout (CU-03), el Servicio Carrito evalúa si el stock resultante es menor o igual al umbral crítico |
+|  | 2 |  | Si la condición se cumple, el Servicio Carrito envía un email de pedido de restock al `email_contacto` del Proveedor correspondiente (según la relación Proveedor\_Producto) de forma asíncrona (fire-and-forget) |
+|  | 3 | El Proveedor recibe el email y prepara el despacho de la mercadería | — |
+|  | 4 | El Vendedor recibe la mercadería y registra las unidades en el sistema | El sistema incrementa `Producto.stock` con la cantidad ingresada por el Vendedor (CU-06) |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
-|  | 2.1 |  | Si la solicitud al Proveedor falla, el sistema registra el error. El flujo de compra no se ve afectado. |
-|  | 4.1 |  | Si el webhook de reposición falla o no llega, el stock no se actualiza automáticamente. El Vendedor puede corregirlo manualmente vía CU-06. |
+|  | 2.1 |  | Si el envío del email falla, el sistema registra el error en el log. El flujo de compra no se ve afectado. |
+|  | 2.2 |  | Si el Producto no tiene Proveedor asociado en Proveedor\_Producto, no se envía ningún email. |
 | **Rendimiento** | — |  |  |
 | **Frecuencia** | Baja |  |  |
 | **Importancia** | Alta |  |  |
 | **Urgencia** | Inmediatamente |  |  |
-| **Comentarios** | El Proveedor al que se notifica se determina a partir de la tabla Proveedor\_Producto usando el `id_producto` afectado. El flujo de retorno (paso 4) cierra el ciclo definido en el DFD: "Sistema de Proveeduría → Marketplace: Envío de productos". |  |  |
+| **Comentarios** | El Proveedor al que se notifica se determina a partir de la tabla Proveedor\_Producto usando el `id_producto` afectado. El umbral crítico es de 5 unidades (constante `STOCK_CRITICO` en `lib/stock.ts`). El email es fire-and-forget: su falla no afecta el checkout ni genera errores visibles al Comprador. |  |  |

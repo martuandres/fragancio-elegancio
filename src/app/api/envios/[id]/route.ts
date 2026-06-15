@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
+import { enviarEmail } from "@/lib/notificaciones";
 import { NextRequest } from "next/server";
 
 async function resolveUsuario() {
@@ -115,6 +116,21 @@ export async function PATCH(
     },
     select: { id_envio: true, estado: true, track_code: true },
   });
+
+  if (body.estado !== undefined) {
+    prisma.carrito.findUnique({
+      where: { id_carrito },
+      select: { comprador: { select: { email: true, nombre: true } } },
+    }).then((carritoData) => {
+      if (carritoData?.comprador?.email) {
+        enviarEmail(
+          carritoData.comprador.email,
+          "Estado de tu envío actualizado — Fragancio Elegancio",
+          `Hola ${carritoData.comprador.nombre}, el estado de tu envío cambió a "${actualizado.estado}".${actualizado.track_code ? ` Código de seguimiento: ${actualizado.track_code}.` : ""}`
+        ).catch(() => {});
+      }
+    }).catch(() => {});
+  }
 
   return Response.json(actualizado);
 }

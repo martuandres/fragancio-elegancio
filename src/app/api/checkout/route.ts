@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { checkoutAtomico } from "@/lib/stock";
 import { apiError } from "@/lib/api-error";
+import { enviarEmail } from "@/lib/notificaciones";
 
 // POST /api/checkout — confirmar compra y crear pago pendiente desde el carrito activo
 export async function POST() {
@@ -42,13 +43,22 @@ export async function POST() {
   try {
     const result = await checkoutAtomico(carrito.id_carrito, carrito.items);
 
+    for (const { nombre, nuevoStock, emails } of result.restocks) {
+      for (const emailProveedor of emails) {
+        enviarEmail(
+          emailProveedor,
+          `Restock requerido: ${nombre}`,
+          `El stock de "${nombre}" bajó a ${nuevoStock} unidades. Por favor reponer stock.`
+        ).catch(() => {});
+      }
+    }
+
     return Response.json(
       {
         id_pago: result.pago.id_pago,
         id_carrito: result.pago.id_carrito,
         importe_total: result.importe_total,
         estado: result.pago.estado,
-        reservacion_minutos: result.reservationMinutes,
       },
       {
         status: 201,

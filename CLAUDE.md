@@ -87,7 +87,7 @@ npx prisma studio        # Browse DB
 3. Create `Pago` with `estado = "pendiente"`
 4. Set `Carrito.estado = "convertido"`
 
-The 5-minute reservation window is conceptual — there is no TTL job; stock is decremented immediately on checkout and reversed only via payment webhook rejection or manual cancellation.
+Stock is decremented immediately on checkout and restored only via payment webhook rejection or manual cancellation. There is no TTL or time-based reservation mechanism.
 
 ### Recommendation engine (`lib/recomendaciones.ts`)
 
