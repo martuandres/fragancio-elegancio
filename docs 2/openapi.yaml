@@ -249,6 +249,19 @@ paths:
       tags: [Carrito]
       security:
         - bearerAuth: []
+      description: |
+        Quita un ítem del carrito activo del usuario autenticado.
+
+        **Decisión de diseño — query param en lugar de path param:**
+        El carrito activo se identifica por el token JWT del usuario (no tiene un ID propio
+        en la URL del endpoint `/carritos`). El parámetro `id_producto` actúa como un
+        *selector* que indica qué ítem remover del carrito activo del usuario, no como el
+        identificador de un sub-recurso independiente.
+
+        Una URL `DELETE /carritos/{id_producto}` sería ambigua porque sugeriría que
+        `id_producto` identifica un carrito, no un producto dentro del carrito del usuario.
+        Con query param queda claro que se opera sobre el carrito activo del usuario
+        autenticado y se filtra por producto.
       parameters:
         - in: query
           name: id_producto
@@ -332,9 +345,6 @@ paths:
                   estado:
                     type: string
                     example: pendiente
-                  reservacion_minutos:
-                    type: integer
-                    example: 5
         '400':
           description: Carrito vacío o dirección de envío faltante
           content:
@@ -466,10 +476,28 @@ paths:
           $ref: '#/components/responses/ErrorInterno'
 
     patch:
-      summary: Actualizar estado de envío de una orden (solo vendedores)
+      summary: Actualizar estado del pedido — avanzar envío o cancelar (solo vendedores)
       tags: [Pedidos]
       security:
         - bearerAuth: []
+      description: |
+        Este endpoint cumple dos funciones según el valor de `estado`:
+
+        **Avance de envío** (`en_camino`, `entregado`): actualiza `Envio.estado` del envío
+        asociado al pedido. El envío debe existir previamente (el pago tuvo que haber sido
+        confirmado por el webhook). Actualiza la entidad `Envio`.
+
+        **Cancelación** (`cancelado`): cancela el pedido completo en una transacción atómica:
+        restaura el stock de cada ítem del carrito (`Producto.stock += cantidad`), actualiza
+        `Pago.estado` (`aprobado → reembolsado`, `pendiente → rechazado`) y pone
+        `Carrito.estado = "cancelado"`. Solo se puede cancelar si el envío está en estado
+        `preparando` (todavía no fue despachado).
+
+        **Diferencia con `PATCH /envios/{id}`:** ese endpoint gestiona datos logísticos finos
+        — agrega `track_code` y tiene el estado `preparando`. Este endpoint provee la vista
+        unificada del vendedor (avanzar + cancelar) y es el único que puede cancelar un pedido.
+        Ambos endpoints actualizan la entidad `Envio` para los estados de despacho, pero
+        solo este endpoint puede realizar la cancelación con restauración de stock.
       parameters:
         - in: path
           name: id
@@ -489,7 +517,10 @@ paths:
                 estado:
                   type: string
                   enum: [en_camino, entregado, cancelado]
-                  description: Nuevo estado del envío asociado a la orden
+                  description: |
+                    Nuevo estado del pedido.
+                    - `en_camino` / `entregado`: actualizan `Envio.estado`
+                    - `cancelado`: cancela el pedido, repone stock, actualiza `Pago.estado`
                   example: en_camino
       responses:
         '200':
@@ -527,6 +558,104 @@ paths:
           $ref: '#/components/responses/PedidoNoEncontrado'
         '500':
           $ref: '#/components/responses/ErrorInterno'
+
+  # ── PANEL VENDEDOR ──────────────────────────────────────────────────────────
+
+  /vendedor/envios:
+    get:
+      summary: Listar envíos del vendedor autenticado
+      tags: [Vendedor]
+      security:
+        - bearerAuth: []
+      description: >
+        Devuelve los envíos que contienen al menos un producto del vendedor autenticado.
+        Solo muestra los productos propios del vendedor dentro de cada orden (no los de otros vendedores).
+        Por defecto filtra envíos en estado `preparando` (órdenes pendientes de despacho).
+      parameters:
+        - in: query
+          name: estado
+          schema:
+            type: string
+            enum: [preparando, en_camino, entregado]
+            default: preparando
+          description: Filtrar por estado del envío.
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        '200':
+          description: Lista de envíos con datos del carrito y productos del vendedor.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id_envio:
+                          type: integer
+                        id_carrito:
+                          type: integer
+                        estado:
+                          type: string
+                          enum: [preparando, en_camino, entregado]
+                        track_code:
+                          type: string
+                          nullable: true
+                        carrito:
+                          type: object
+                          properties:
+                            id_carrito:
+                              type: integer
+                            fecha_creada:
+                              type: string
+                              format: date-time
+                            comprador:
+                              type: object
+                              properties:
+                                nombre:
+                                  type: string
+                                email:
+                                  type: string
+                                direccion_envio:
+                                  type: string
+                                  nullable: true
+                            items:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  cantidad:
+                                    type: integer
+                                  producto:
+                                    type: object
+                                    properties:
+                                      id_producto:
+                                        type: integer
+                                      nombre:
+                                        type: string
+                                      marca:
+                                        type: string
+                                      imagen_url:
+                                        type: string
+                                        nullable: true
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '401':
+          $ref: '#/components/responses/NoAutenticado'
 
   # ── INVENTARIO ──────────────────────────────────────────────────────────────
 

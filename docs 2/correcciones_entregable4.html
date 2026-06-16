@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Correcciones E4 — Fragancio Elegancio · Grupo 17</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.65;
+      color: #1a1a2e;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+      background: #fafafa;
+    }
+    header {
+      border-bottom: 3px solid #2d4a7a;
+      padding-bottom: 1rem;
+      margin-bottom: 2rem;
+    }
+    header h1 { margin: 0; color: #2d4a7a; font-size: 1.7rem; }
+    header p  { margin: 0.3rem 0 0; color: #555; font-size: 0.95rem; }
+
+    h2 {
+      color: #2d4a7a;
+      border-left: 4px solid #2d4a7a;
+      padding-left: 0.7rem;
+      margin-top: 2.5rem;
+    }
+    h3 { color: #3a5a9a; margin-top: 1.8rem; }
+
+    .obs {
+      background: #fff8e1;
+      border-left: 4px solid #f0b429;
+      padding: 0.7rem 1rem;
+      margin: 0.8rem 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .obs strong { color: #b7791f; }
+
+    .fix {
+      background: #e8f5e9;
+      border-left: 4px solid #2e7d32;
+      padding: 0.7rem 1rem;
+      margin: 0.8rem 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .fix strong { color: #2e7d32; }
+
+    .justif {
+      background: #e3f2fd;
+      border-left: 4px solid #1565c0;
+      padding: 0.7rem 1rem;
+      margin: 0.8rem 0;
+      border-radius: 0 4px 4px 0;
+    }
+    .justif strong { color: #1565c0; }
+
+    code {
+      background: #eef1f7;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.88em;
+      font-family: "Courier New", monospace;
+    }
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 1rem 1.2rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+    }
+    th {
+      background: #2d4a7a;
+      color: white;
+      text-align: left;
+      padding: 0.5rem 0.8rem;
+      font-size: 0.9rem;
+    }
+    td {
+      border: 1px solid #ddd;
+      padding: 0.5rem 0.8rem;
+      vertical-align: top;
+      font-size: 0.9rem;
+    }
+    tr:nth-child(even) td { background: #f5f7fb; }
+
+    .pregunta-num {
+      display: inline-block;
+      background: #2d4a7a;
+      color: white;
+      border-radius: 50%;
+      width: 1.6rem;
+      height: 1.6rem;
+      line-height: 1.6rem;
+      text-align: center;
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-right: 0.5rem;
+    }
+
+    footer {
+      margin-top: 3rem;
+      border-top: 1px solid #ccc;
+      padding-top: 1rem;
+      color: #777;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Correcciones y Respuestas — Devolución Entregable 4</h1>
+  <p>
+    Arquitectura y Diseño de Sistemas 2026 &nbsp;·&nbsp;
+    Grupo 17 · Fragancio Elegancio &nbsp;·&nbsp;
+    Agostino Laurella Crippa, Pierino Oscar Spina, Ana Martina Andrés, Tomás Copelotti, José Ignacio Ubici
+  </p>
+  <p>Este documento detalla cada corrección realizada en respuesta al feedback de la cátedra,
+     con la justificación técnica de cada decisión y las respuestas a las 5 preguntas de §5.</p>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>§2 — Diseño de APIs</h2>
+
+<!-- ─── A ─── -->
+<h3>A. Ambigüedad entre <code>PATCH /pedidos/{id}</code> y <code>PATCH /envios/{id}</code></h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  En <code>PATCH /pedidos/{id}</code>, el body solo acepta <code>estado</code>
+  (enum: <code>en_transito | entregado | cancelado</code>) según el documento.
+  Sin embargo en <code>PATCH /envios/{id}</code> se acepta tanto <code>estado</code>
+  como <code>track_code</code>. Ambos endpoints son para vendedores y actualizan datos
+  del envío — ¿son realmente dos endpoints distintos o hay solapamiento de responsabilidades?
+  La descripción de <code>/pedidos/{id}</code> decía "Actualizar estado de envío de una orden",
+  lo que generaba ambigüedad.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada (openapi.yaml):</strong>
+  Se actualizó el <code>summary</code> de <code>PATCH /pedidos/{id}</code> a
+  <em>"Actualizar estado del pedido — avanzar envío o cancelar (solo vendedores)"</em>
+  y se agregó un campo <code>description</code> detallado que explica las dos funciones del endpoint.
+  También se precisó la descripción del campo <code>estado</code> dentro del <code>requestBody</code>.
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  Los dos endpoints son necesarios y tienen responsabilidades diferenciadas:
+
+  <table>
+    <tr>
+      <th>Endpoint</th>
+      <th>Entidades que modifica</th>
+      <th>Función principal</th>
+    </tr>
+    <tr>
+      <td><code>PATCH /pedidos/{id}</code></td>
+      <td>
+        <code>Envio.estado</code> (para <em>en_camino</em>, <em>entregado</em>)<br/>
+        <code>Pago.estado</code> + <code>Carrito.estado</code> + restauración de stock
+        (para <em>cancelado</em>)
+      </td>
+      <td>Vista unificada del vendedor: avanzar el estado del despacho <strong>o</strong>
+          cancelar el pedido completo (con restauración de stock atómica).
+          Es el único endpoint que puede cancelar un pedido.</td>
+    </tr>
+    <tr>
+      <td><code>PATCH /envios/{id}</code></td>
+      <td><code>Envio.estado</code> + <code>Envio.track_code</code></td>
+      <td>Gestión logística fina: carga el código de seguimiento del transportista
+          y avanza entre los estados de despacho (incluye <em>preparando</em>,
+          que no está en /pedidos). No puede cancelar.</td>
+    </tr>
+  </table>
+
+  Hay solapamiento parcial: ambos pueden actualizar <code>Envio.estado</code> para
+  <em>en_camino</em> y <em>entregado</em>. El solapamiento es intencional — el vendedor
+  puede usar la vista simplificada de pedidos o la vista logística detallada según
+  el flujo en el que esté. La diferencia clave es que <code>/pedidos/{id}</code>
+  es el único que puede cancelar (y el único que tiene <em>cancelado</em> como estado válido),
+  mientras que <code>/envios/{id}</code> es el único que puede actualizar el <code>track_code</code>
+  y tiene el estado <em>preparando</em>.
+</div>
+
+<!-- ─── B ─── -->
+<h3>B. <code>DELETE /carritos</code> con query param en lugar de path param</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  El endpoint <code>DELETE /carritos</code> quita un ítem usando <code>id_producto</code>
+  como query param. Semánticamente, <code>DELETE /carritos/{id_producto}</code> (path param)
+  sería más REST-puro. El uso de query param en un DELETE es inusual y puede generar confusión.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada (openapi.yaml):</strong>
+  Se agregó un campo <code>description</code> al método DELETE de <code>/carritos</code>
+  explicando la decisión de diseño y por qué se optó por query param.
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  En este sistema, el <strong>carrito activo del usuario</strong> es el recurso que se modifica —
+  y ese carrito se identifica por el token JWT, no por un ID en la URL.
+  El parámetro <code>id_producto</code> es un <em>selector</em> que indica qué ítem
+  remover del carrito activo del usuario autenticado.
+  <br/><br/>
+  Una URL <code>DELETE /carritos/{id_producto}</code> sería semánticamente ambigua:
+  sugeriría que <code>id_producto</code> identifica un carrito, cuando en realidad identifica
+  un producto dentro del carrito del usuario actual.
+  Con query param queda claro que el recurso a modificar es <em>el carrito activo del usuario
+  autenticado</em> y que <code>id_producto</code> es un filtro sobre su contenido.
+  <br/><br/>
+  Una alternativa REST-pura más correcta sería <code>DELETE /carritos/items/{id_producto}</code>,
+  que expone los ítems como sub-recurso. Se reconoce que esta forma sería más idiomática;
+  la decisión de usar query param se mantuvo por consistencia con la ruta existente
+  <code>POST /carritos</code> que usa el mismo endpoint base para agregar ítems.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>§3 — Pipelines de Datos</h2>
+
+<!-- ─── C ─── -->
+<h3>C. Inconsistencia entre <code>reservacion_minutos: 5</code> y la implementación real</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  La reserva de 5 minutos figura en la respuesta del checkout (<code>reservacion_minutos: 5</code>)
+  y en el documento de APIs, pero el pipeline de compra y el ADR reconocen que esta funcionalidad
+  quedó simplificada. Hay inconsistencia entre lo que la API promete (5 minutos de reserva) y lo que
+  el sistema implementa (sin liberación automática del stock). Debería unificarse la documentación:
+  o eliminar <code>reservacion_minutos</code> del response schema, o documentar explícitamente en el
+  pipeline que la liberación automática no está implementada.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada:</strong>
+  <ul>
+    <li><strong>openapi.yaml:</strong> se eliminó el campo <code>reservacion_minutos</code>
+        del response schema de <code>POST /checkout</code> (respuesta 201).</li>
+    <li><strong>pipeline-datos.md — Pipeline 3, trade-offs:</strong> se agregó una nota explícita
+        en la fila "Decremento permanente vs. reserva temporal" explicando que el campo fue eliminado
+        y por qué la liberación automática no se implementó.</li>
+  </ul>
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  La liberación automática de stock después de 5 minutos requeriría alguno de estos mecanismos:
+  (a) un cron job externo que expire reservas, o (b) un campo <code>reservado_hasta TIMESTAMP</code>
+  en el modelo de datos que se evalúe al volver a hacer checkout.
+  Ninguno de los dos está implementado, principalmente porque el entorno serverless (Vercel)
+  no puede correr procesos en background persistentes (timer en memoria), y agregar un cron externo
+  aumenta la complejidad de infraestructura sin beneficio proporcional al volumen actual del sistema.
+  <br/><br/>
+  En la práctica, el riesgo de stock "bloqueado" es bajo porque el proveedor de pagos
+  responde el resultado (aprobado/rechazado) vía webhook en segundos, no en minutos.
+  El stock se restaura en ese webhook si el pago es rechazado, o queda decrementado si es aprobado.
+  El campo <code>reservacion_minutos</code> prometía un comportamiento que el sistema no cumple,
+  por eso se eliminó del schema.
+</div>
+
+<!-- ─── D ─── -->
+<h3>D. Pipeline de Compra — ¿el stock queda decrementado si el pago es rechazado?</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  El pipeline de compra decrementa el stock antes de confirmar el pago.
+  El Pipeline 2 (webhook) no documentaba explícitamente qué pasa con el stock
+  cuando el pago es rechazado.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada (pipeline-datos.md — Pipeline 2):</strong>
+  Se agregó el sub-paso <strong>3e. Restauración de stock</strong> al Pipeline 2, describiendo
+  que cuando el webhook indica <code>estado = rechazado</code>, el sistema incrementa
+  <code>Producto.stock</code> por cada ítem del carrito dentro de la misma transacción Prisma
+  que actualiza <code>Pago.estado</code> y <code>Carrito.estado</code>.
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  El comportamiento ya existía (documentado en CU-08, excepción 1.1) pero faltaba como paso
+  explícito en el pipeline. La restauración ocurre dentro de <code>prisma.$transaction</code>,
+  garantizando que o todo se actualiza (Pago + Carrito + Stock) o nada lo hace.
+  <br/><br/>
+  Adicionalmente, cuando un vendedor cancela manualmente un pedido vía
+  <code>PATCH /api/pedidos/{id}</code> con estado <code>cancelado</code>, el mismo mecanismo
+  de restauración de stock se aplica (también dentro de una transacción).
+</div>
+
+<!-- ─── E ─── -->
+<h3>E. Motor de Recomendaciones — ¿por qué está categorizado como pipeline?</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  El motor es la lógica de negocio de un endpoint REST: dos queries a la BD, cómputo en memoria
+  y respuesta HTTP. No hay etapas desacopladas ni flujo entre sistemas. La documentación del
+  algoritmo es excelente, pero la categorización como "pipeline" es discutible.
+  ¿Qué criterio usó el grupo para incluirlo en este artefacto y no en el documento de APIs?
+</div>
+
+<div class="justif">
+  <strong>Respuesta del grupo:</strong>
+  El criterio fue que el motor tiene <strong>etapas diferenciadas con responsabilidades distintas</strong>,
+  análogas a las etapas de un pipeline ETL aunque síncronas:
+  <ol>
+    <li><strong>Ingesta</strong> — parámetros HTTP + validación</li>
+    <li><strong>Extracción</strong> — dos queries a PostgreSQL (producto base + candidatos con stock)</li>
+    <li><strong>Transformación</strong> — tokenización de notas, cálculo de Jaccard por campo, score ponderado, blend con historial</li>
+    <li><strong>Filtrado y ordenamiento</strong> — sort descendente + truncado al límite</li>
+    <li><strong>Salida</strong> — JSON al cliente (sin escritura en BD)</li>
+  </ol>
+  A diferencia de un endpoint típico que solo consulta y serializa datos, el motor aplica
+  un <strong>algoritmo de múltiples pasos sobre los datos</strong> antes de devolverlos.
+  Se lo incluyó en el artefacto de pipelines porque el algoritmo de Jaccard tiene sustancia
+  arquitectónica propia (con trade-offs documentados: Jaccard vs. embeddings, en tiempo real vs. pre-computado,
+  con y sin historial) que justificaba documentarlo en detalle más allá de lo que
+  permite el openapi.yaml.
+  <br/><br/>
+  Se reconoce que la categorización es discutible: en términos estrictos es la lógica de negocio
+  de un endpoint REST (clasificación "On-Demand Request-Response") y no un pipeline con etapas
+  desacopladas en el tiempo. El documento de APIs describe el contrato del endpoint;
+  el documento de pipelines describe el algoritmo interno.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>§4 — Decisiones Arquitectónicas (ADRs)</h2>
+
+<!-- ─── F ─── -->
+<h3>F. ADR-003 — CU-10 y el Sistema de Proveeduría</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  ADR-003 menciona el Sistema de Proveeduría como un sistema externo. Sin embargo, CU-10 no
+  aparece en el documento de APIs: no hay ningún endpoint que reciba un webhook de reposición
+  de stock. Si CU-10 está en el alcance del sistema, falta el endpoint correspondiente
+  en el openapi.yaml. Si quedó fuera del alcance, conviene aclararlo en el ADR-003.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada (docs/adrs.md — ADR-003 Consecuencias):</strong>
+  Se reescribió la fila correspondiente a CU-10 para que quede <strong>explícito que el flujo
+  es OUTBOUND</strong>: el marketplace envía email al proveedor, no al revés.
+  La fila anterior decía "el marketplace envía un email al proveedor y no espera respuesta"
+  pero no aclaraba que el proveedor nunca envía ningún webhook de vuelta.
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  CU-10 (Restock Automático) es un flujo <strong>saliente (OUTBOUND)</strong>:
+  <ol>
+    <li>El checkout decrementa el stock.</li>
+    <li>El sistema evalúa si el stock resultante cayó por debajo del umbral crítico (5 unidades, constante <code>STOCK_CRITICO</code> en <code>lib/stock.ts</code>).</li>
+    <li>Si sí, invoca <code>lib/notificaciones.ts</code> de forma fire-and-forget para enviar un email al <code>email_contacto</code> del proveedor (tabla <code>ProveedorProducto</code>).</li>
+    <li>El proveedor despacha la mercadería. Al recibirla, el vendedor actualiza el stock manualmente desde su panel (CU-06).</li>
+  </ol>
+  El Sistema de Proveeduría <strong>no envía ningún webhook entrante al marketplace</strong>.
+  Por lo tanto no existe ni se necesita ningún endpoint en el openapi.yaml para CU-10.
+  La ausencia del endpoint no es un gap: refleja correctamente que la comunicación es
+  unidireccional (marketplace → proveedor) y no require un receptor HTTP en el sistema.
+</div>
+
+<!-- ─── G ─── -->
+<h3>G. ADR-004 — Reserva temporal de stock: ¿qué solución se adoptó?</h3>
+
+<div class="obs">
+  <strong>Observación de la cátedra:</strong>
+  ADR-004 propone como solución un "campo <code>reservado_hasta TIMESTAMP</code>" o
+  "cron job externo", pero no indica cuál de las dos opciones adoptó el grupo ni si
+  alguna está implementada. Dado que <code>reservacion_minutos: 5</code> aparece en la
+  respuesta del checkout, es razonable que se aclare en el ADR cómo se resolvió.
+</div>
+
+<div class="fix">
+  <strong>Corrección realizada:</strong>
+  <ul>
+    <li><strong>openapi.yaml:</strong> se eliminó <code>reservacion_minutos: 5</code> del response del checkout (Cambio C).</li>
+    <li><strong>pipeline-datos.md:</strong> se agregó nota explicando que el campo fue eliminado y por qué (Cambio E).</li>
+  </ul>
+</div>
+
+<div class="justif">
+  <strong>Justificación técnica:</strong>
+  Ninguna de las dos opciones se implementó. La decisión fue <strong>no implementar liberación
+  automática</strong> por las siguientes razones:
+  <ul>
+    <li><strong>Cron job externo:</strong> Vercel (entorno serverless) no puede correr procesos en background persistentes.
+        Un cron externo (GitHub Actions, Railway Scheduler) agrega complejidad de infraestructura no justificada.</li>
+    <li><strong>Campo <code>reservado_hasta</code>:</strong> Requeriría una migración del schema,
+        lógica de evaluación en cada operación que toca stock, y aún así necesitaría un proceso
+        que libere expiradas periódicamente.</li>
+    <li><strong>Razón pragmática:</strong> la confirmación de pago llega vía webhook en segundos
+        (no en minutos), por lo que el riesgo de stock "bloqueado indefinidamente" es mínimo en la práctica.
+        Si el pago es rechazado, el webhook restaura el stock en la misma transacción. Si el webhook
+        nunca llega (fallo del proveedor), el stock queda decrementado hasta que el vendedor
+        cancele manualmente — comportamiento documentado como gap conocido.</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>§5 — Respuestas a las Preguntas de la Cátedra</h2>
+
+<h3><span class="pregunta-num">1</span>
+<code>PATCH /pedidos/{id}</code> y <code>PATCH /envios/{id}</code>:
+¿actualizan entidades distintas? ¿Por qué dos endpoints?</h3>
+
+<p>
+  <strong>Sí, con matices.</strong> <code>PATCH /pedidos/{id}</code> puede actualizar
+  dos entidades según el estado recibido:
+  <code>Envio.estado</code> (para <em>en_camino</em> y <em>entregado</em>)
+  o bien <code>Pago.estado + Carrito.estado + Producto.stock</code> en transacción (para <em>cancelado</em>).
+  <code>PATCH /envios/{id}</code> actualiza solo <code>Envio.estado</code> y <code>Envio.track_code</code>.
+</p>
+<p>
+  Los dos endpoints coexisten porque tienen funciones diferentes que no se solapan completamente:
+  <strong>/pedidos/{id}</strong> es la <em>vista unificada del vendedor</em> para gestionar el ciclo
+  de vida de un pedido (incluyendo cancelación con restauración de stock);
+  <strong>/envios/{id}</strong> es la <em>vista logística</em> para registrar datos de despacho
+  (<code>track_code</code>, estado <em>preparando</em>).
+  El solapamiento en [<em>en_camino</em>, <em>entregado</em>] es intencional — el vendedor
+  puede operar desde cualquiera de los dos contextos.
+</p>
+
+<h3><span class="pregunta-num">2</span>
+Si el pago es rechazado, ¿el stock queda decrementado permanentemente?</h3>
+
+<p>
+  <strong>No.</strong> El webhook de pagos (<code>POST /api/pagos/webhook</code>) maneja
+  el caso <code>estado = rechazado</code> restaurando el stock de cada ítem del carrito
+  (<code>Producto.stock += CarritoProducto.cantidad</code>) dentro de la misma
+  transacción Prisma que actualiza <code>Pago.estado = "rechazado"</code> y
+  <code>Carrito.estado = "cancelado"</code>.
+  Esto garantiza que o todo se revierte o nada lo hace.
+  El comportamiento está documentado en CU-08 (excepción 1.1) y se explicitó
+  en el Pipeline 2 como el nuevo paso 3e en esta corrección.
+</p>
+
+<h3><span class="pregunta-num">3</span>
+¿Qué pasaría si el catálogo creciera a 10.000 productos?</h3>
+
+<p>
+  Con el algoritmo actual (scan lineal de todos los candidatos + Jaccard en memoria),
+  el tiempo de cómputo crece <strong>O(n)</strong> por request.
+  Para 10.000 productos, la query inicial traería ~10.000 filas con todos sus campos
+  de notas, y el cómputo en memoria podría superar los 500 ms (viola RNF-5 de latencia).
+</p>
+<p>Soluciones en orden de complejidad creciente:</p>
+<ol>
+  <li><strong>Cache Redis:</strong> guardar los scores pre-computados para cada producto; invalidar cuando se actualiza un producto. Resuelve el cómputo repetido sin cambios en el modelo de datos.</li>
+  <li><strong>Tabla <code>SimilitudProducto</code>:</strong> pre-computar la matriz de similitud en un proceso batch (por ej. nightly) y guardar los top-N pares. Cada request hace una sola query a esta tabla en lugar de computar en memoria.</li>
+  <li><strong>Extensión <code>pgvector</code> de PostgreSQL:</strong> convertir las notas a vectores de embeddings y usar un índice HNSW para búsqueda por similitud vectorial. Escala bien a millones de productos.</li>
+</ol>
+<p>
+  El diseño actual está acotado al alcance documentado: catálogo de 100–500 productos activos
+  (Pipeline 1 — "Volumen estimado"), donde el cálculo tarda menos de 50 ms.
+</p>
+
+<h3><span class="pregunta-num">4</span>
+ADR-003 menciona CU-10 (reposición de stock). ¿Está implementado ese endpoint? ¿Dónde?</h3>
+
+<p>
+  <strong>CU-10 no requiere un endpoint entrante</strong> porque el flujo es OUTBOUND:
+  el marketplace le envía un email al proveedor, no al revés.
+  El Sistema de Proveeduría no envía ningún webhook al marketplace.
+</p>
+<p>La implementación está en:</p>
+<ul>
+  <li><code>lib/notificaciones.ts</code> — función <code>enviarEmail()</code>, que envía el email al proveedor fire-and-forget.</li>
+  <li><code>lib/stock.ts</code> — la función <code>checkoutAtomico()</code> evalúa el stock post-checkout y, si es menor o igual al umbral crítico, invoca la notificación sin <code>await</code>.</li>
+</ul>
+<p>
+  No hay ningún endpoint HTTP receptor para CU-10 porque el proveedor no necesita
+  llamar al marketplace. El ciclo completa cuando el proveedor despacha la mercadería
+  y el vendedor actualiza el stock manualmente (CU-06 vía <code>PATCH /api/inventario/{id}</code>).
+</p>
+
+<h3><span class="pregunta-num">5</span>
+¿Cómo afecta la tensión ADR-003 / ADR-004 al email de confirmación de compra
+si la función serverless termina antes de que se dispare el envío?</h3>
+
+<p>
+  Es un <strong>riesgo conocido</strong>, documentado en ADR-003 (Consecuencias Negativas):
+  <em>"El modelo fire-and-forget no garantiza entrega del email."</em>
+</p>
+<p>
+  En el webhook de pagos (<code>POST /api/pagos/webhook</code>), el email de confirmación
+  de compra se dispara sin <code>await</code> (fire-and-forget) dentro del handler.
+  Si Vercel termina la función serverless antes de que la promesa del email se resuelva,
+  el email se pierde silenciosamente.
+</p>
+<p><strong>Mitigación actual:</strong> el handler devuelve la respuesta HTTP <code>2xx</code>
+  <em>después</em> de disparar el email. En la implementación de Vercel con Node.js,
+  el runtime generalmente drena las microtasks del event loop antes de cerrar la función,
+  por lo que el email suele completarse en la práctica.
+  Sin embargo, esto no está garantizado formalmente.
+</p>
+<p><strong>Solución real:</strong> para garantía de entrega se necesitaría uno de estos mecanismos:</p>
+<ul>
+  <li>Guardar el evento "email pendiente" en la BD y procesarlo con un cron job (patrón Outbox).</li>
+  <li>Usar un proveedor de email con reintentos (Resend, SendGrid) que garantice entrega por su propia infraestructura.</li>
+  <li>Encolar el evento en una cola (SQS, RabbitMQ) desde la función serverless y procesarlo con un worker separado.</li>
+</ul>
+<p>
+  Estas soluciones están fuera del alcance de la entrega pero son el camino correcto
+  si se necesita alta confiabilidad en las notificaciones.
+</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<footer>
+  Fragancio Elegancio — Correcciones Entregable 4 &nbsp;·&nbsp;
+  Arquitectura y Diseño de Sistemas 2026 &nbsp;·&nbsp; Grupo 17
+</footer>
+
+</body>
+</html>

@@ -250,6 +250,18 @@ Pago.estado: "pendiente" → "aprobado" | "rechazado"
 - Dirección de entrega: obtenida de `Comprador.direccion_envio` (via `Carrito.legajo → Comprador`)
 - `track_code` queda en `null` hasta que el vendedor lo cargue vía `PATCH /api/envios/{id}`
 
+**3e. Restauración de stock** (solo si estado = `rechazado`)
+
+Si el pago fue rechazado, el sistema revierte el decremento de stock realizado en el checkout (Pipeline 3), dentro de la misma transacción Prisma:
+
+```
+Para cada ítem en CarritoProducto donde id_carrito = :id_carrito:
+  producto.stock += item.cantidad      ← repone el stock decrementado en el checkout
+Carrito.estado → "cancelado"
+```
+
+Esto garantiza que el stock nunca queda decrementado permanentemente por un pago fallido. Coordinado con CU-08 (excepción 1.1). La cancelación manual por el vendedor (`PATCH /api/pedidos/{id}` con estado `cancelado`) sigue la misma lógica de restauración de stock.
+
 ---
 
 ▼
@@ -434,7 +446,7 @@ Esto previene que el mismo carrito genere múltiples pagos — la constraint `@u
 | Trade-off | Decisión | Alternativa descartada |
 |---|---|---|
 | **Transacción de DB vs. reserva en memoria** | `prisma.$transaction` sobre PostgreSQL | Mutex en memoria / Redis lock. Se descartó: un mutex en Node.js no funciona en múltiples instancias del servidor; Redis añade complejidad innecesaria |
-| **Decremento permanente vs. reserva temporal** | El stock se decrementa definitivamente al confirmar el checkout. Si el pago es rechazado, el stock se restaura vía webhook | Una reserva temporal con expiración automática requeriría un cron job externo o campo `reservado_hasta` en el modelo — complejidad que no justifica el beneficio dado que el pago externo responde de forma inmediata vía webhook |
+| **Decremento permanente vs. reserva temporal** | El stock se decrementa definitivamente al confirmar el checkout. Si el pago es rechazado, el stock se restaura vía webhook (paso 3e del Pipeline 2). Si el vendedor cancela manualmente, `PATCH /api/pedidos/{id}` con estado `cancelado` también restaura el stock. | Una reserva temporal con expiración automática requeriría un cron job externo o campo `reservado_hasta` en el modelo — complejidad que no justifica el beneficio dado que el pago externo responde de forma inmediata vía webhook. **Nota:** la respuesta HTTP del checkout incluía anteriormente el campo `reservacion_minutos: 5`. Ese campo fue **eliminado del schema** porque la liberación automática no está implementada (no existe cron job ni campo `reservado_hasta` en la BD). Incluirlo prometía un comportamiento que el sistema no cumple. |
 | **Precio en respuesta vs. precio persistido** | El `importe_total` se calcula durante el checkout y se retorna al cliente; se persiste en `Factura` al confirmar el pago (Pipeline 2) | Guardar precio en un campo de `Pago`. Se descartó para evitar denormalización — `Factura` ya captura el importe final cuando el pago se confirma |
 | **Loop secuencial vs. paralelo para validar stock** | Secuencial dentro de la transacción | Paralelo con `Promise.all`. El paralelo puede generar deadlocks en PostgreSQL por bloqueos de fila — el secuencial es más predecible |
 

@@ -1,0 +1,144 @@
+DISCREPANCIAS ENTRE CASOS DE USO Y MODELO DE DATOS
+Grupo 17 — Fragancio Elegancio
+====================================================
+
+Este documento resume los puntos donde el modelo de datos (Prisma schema actual)
+no refleja exactamente lo que los casos de uso plantean, y las opciones para resolver
+cada uno. La idea es elegir una postura grupal para presentarle a la profe.
+
+
+══════════════════════════════════════════════════════════════
+DISCREPANCIA 1 — ¿Cómo sabe el sistema qué productos son de qué vendedor?
+[RESUELTA]
+══════════════════════════════════════════════════════════════
+
+EN LOS CASOS DE USO (CU-05, CU-06):
+  El vendedor tiene sus propios productos. Puede listarlos, modificarlos y ver las
+  órdenes que incluyen sus productos (panel de ventas).
+
+EN EL MODELO ACTUAL:
+  Existe la tabla junction VendedorProducto con clave compuesta (id_vendedor, id_producto).
+  La relación es directa: Vendedor → VendedorProducto → Producto.
+  No hay ningún workaround a través de ProveedorProducto — esa tabla existe
+  para la relación entre proveedores externos (fabricantes) y sus productos,
+  que es una relación diferente.
+
+ESTADO: No hay discrepancia. El modelo coincide con los casos de uso.
+  La tabla VendedorProducto resuelve exactamente la necesidad de CU-06.
+
+
+══════════════════════════════════════════════════════════════
+DISCREPANCIA 2 — Panel de ventas (CU-06): órdenes "del vendedor"
+[RESUELTA]
+══════════════════════════════════════════════════════════════
+
+EN LOS CASOS DE USO:
+  El vendedor ve las órdenes de compra pagadas que contienen sus productos
+  y están pendientes de despacho.
+
+EN EL MODELO ACTUAL:
+  Existe GET /api/vendedor/envios. Filtra envíos donde el carrito contiene al
+  menos un producto del vendedor, y en el resultado devuelve solo los ítems
+  propios del vendedor (no expone productos de otros vendedores en la misma orden).
+  Soporta ?estado= (preparando / en_camino / entregado) y paginación.
+
+ESTADO: Funcionalidad implementada y documentada en openapi.yaml.
+
+
+══════════════════════════════════════════════════════════════
+DISCREPANCIA 3 — ¿Cuándo se descuenta el stock? (CU-03, CU-07, RN-1, RN-4)
+══════════════════════════════════════════════════════════════
+
+EN LOS CASOS DE USO:
+  CU-03 dice: al confirmar el pago, se descuenta el stock definitivamente.
+  RN-4 dice: si el pago falla, el stock debe liberarse.
+  CU-07 dice: el stock se descuenta DESPUÉS de que el pago es confirmado.
+
+EN EL MODELO ACTUAL (lib/stock.ts + checkout/route.ts):
+  El stock se decrementa EN EL CHECKOUT, ANTES de que el pago sea confirmado
+  por la pasarela. Si el pago es rechazado, el stock NO se restaura automáticamente.
+
+  Esto es una diferencia real con lo especificado en los CU.
+
+OPCIONES:
+
+  A) Aceptar como trade-off y documentarlo
+     - "Se decidió decrementar el stock en el checkout (no al confirmar el pago)
+       para simplificar el flujo. La liberación de stock ante pago rechazado queda
+       fuera del alcance del MVP."
+     - El documento del pipeline (Entregable 4) ya lo menciona en los trade-offs
+
+  B) Mover el decremento de stock al webhook de pago (cuando estado = "aprobado")
+     - Cambio en: lib/stock.ts y api/pagos/webhook/route.ts
+     - Riesgo: sin reserva temporal, dos usuarios podrían comprar el mismo último item
+     - Para resolverlo bien habría que implementar el sistema de reserva de 5 minutos
+       que también quedó fuera del alcance (ver trade-off en pipeline)
+
+  RECOMENDACIÓN GRUPAL: opción A. Ya está documentado en el Entregable 4 como
+  trade-off aceptado. Es la respuesta más consistente con lo que ya entregaron.
+
+
+══════════════════════════════════════════════════════════════
+DISCREPANCIA 4 — Notificaciones por email (CU-08, RN de disponibilidad)
+[RESUELTA]
+══════════════════════════════════════════════════════════════
+
+EN LOS CASOS DE USO:
+  CU-08: cuando el vendedor actualiza el estado del envío, el comprador recibe
+  un correo automático.
+  RNF-2: si el servicio de notificaciones falla, la compra debe completarse igual.
+
+EN EL MODELO ACTUAL:
+  PATCH /api/envios/[id] importa y llama a enviarEmail() de lib/notificaciones.ts
+  (implementado con Nodemailer). El call es fire-and-forget (sin await), por lo que
+  si falla el email, la actualización del estado del envío sigue adelante.
+  Esto cumple exactamente con CU-08 y RNF-2.
+
+ESTADO: No hay discrepancia. Funcionalidad completamente implementada.
+
+
+══════════════════════════════════════════════════════════════
+DISCREPANCIA 5 — Reputación del vendedor (RN-2)
+══════════════════════════════════════════════════════════════
+
+EN LAS REGLAS DE NEGOCIO:
+  RN-2: la reputación del vendedor se recalcula automáticamente cuando una orden
+  pasa a "Entregado" y el comprador califica.
+
+EN EL MODELO ACTUAL:
+  El campo Vendedor.reputacion existe en el schema.
+  PERO no hay lógica de calificación ni actualización automática.
+  Tampoco hay una entidad "Calificación" o "Reseña" en el schema.
+
+OPCIONES:
+
+  A) Documentar como funcionalidad fuera del alcance del MVP
+     - El campo reputacion existe como placeholder
+     - No hay flujo de calificación implementado ni en el modelo ni en las rutas
+
+  B) Agregar una entidad Calificacion y la lógica de recálculo
+     - Sería un cambio de modelo + nueva ruta + trigger en el webhook de envío
+
+  RECOMENDACIÓN GRUPAL: opción A. Es el cambio más grande y no tiene casos de
+  uso detallados en el Entregable 1. Se puede mencionar como mejora futura.
+
+
+══════════════════════════════════════════════════════════════
+RESUMEN DE ESTADO
+══════════════════════════════════════════════════════════════
+
+  1. [RESUELTA] Vendedor → Producto: la tabla VendedorProducto ya resuelve
+     la relación directamente. No hay workaround.
+
+  2. [RESUELTA] Panel de ventas: existe GET /api/vendedor/envios. Se mejoró para
+     filtrar solo los productos del propio vendedor dentro de cada orden, agregar
+     paginación y parámetro ?estado= (default "preparando"). Documentado en openapi.yaml.
+
+  3. [ACEPTADA COMO TRADE-OFF] Timing del stock: documentado en el Entregable 4.
+     Stock se decrementa en checkout, no al confirmar pago. No cambiar.
+
+  4. [RESUELTA] Notificaciones: enviarEmail() ya está implementado con Nodemailer
+     en PATCH /api/envios/[id], fire-and-forget. Cumple CU-08 y RNF-2.
+
+  5. [FUERA DE SCOPE] Reputación: campo placeholder en schema, sin lógica.
+     Documentar como mejora futura.
