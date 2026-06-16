@@ -180,7 +180,7 @@ export async function PATCH(
     if (carrito.pago && carrito.pago.estado !== "rechazado") {
       await tx.pago.update({
         where: { id_pago: carrito.pago.id_pago },
-        data: { estado: carrito.pago.estado === "aprobado" ? "reembolsado" : "rechazado" },
+        data: { estado: "rechazado" },
       });
     }
 

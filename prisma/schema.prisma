@@ -20,8 +20,8 @@ model Comprador {
   legajo          String    @id
   email           String    @unique
   nombre          String
-  direccion_envio String?
-  telefono        String?
+  direccion_envio String
+  telefono        String
   carritos        Carrito[]
 }
 
@@ -37,8 +37,13 @@ model Producto {
   marca         String
   nombre        String
   stock         Int                 @default(0)
-  ingrediente   String?
+  ingrediente   String
   imagen_url    String?
+  // Opcionales en schema porque el seed (PerfumAPI) no garantiza estos datos para todos los
+  // perfumes — 23/100 productos seedeados tienen alguno en NULL. Sin embargo, la API
+  // (POST /api/inventario y PUT /api/inventario/[id]) los exige obligatoriamente al crear o
+  // editar productos: son atributos centrales del Motor de Recomendación (CU-05, Pipeline 1)
+  // y del dominio del negocio — ningún perfume debería existir sin notas olfativas.
   notas_salida  String?
   notas_corazon String?
   notas_fondo   String?

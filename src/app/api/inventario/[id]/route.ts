@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
+import type { Prisma } from "@/generated/prisma/client";
 
 async function resolveVendedor() {
   const { userId } = await auth();
@@ -113,22 +114,31 @@ export async function PUT(
     return apiError("CAMPO_INVALIDO", "El campo 'nombre' no puede estar vacío.", 400);
   if (marca !== undefined && (typeof marca !== "string" || !String(marca).trim()))
     return apiError("CAMPO_INVALIDO", "El campo 'marca' no puede estar vacío.", 400);
+  if (ingrediente !== undefined && (!ingrediente || typeof ingrediente !== "string" || !String(ingrediente).trim()))
+    return apiError("CAMPO_INVALIDO", "El campo 'ingrediente' no puede estar vacío.", 400);
+  if (notas_salida !== undefined && (!notas_salida || typeof notas_salida !== "string" || !String(notas_salida).trim()))
+    return apiError("CAMPO_INVALIDO", "El campo 'notas_salida' no puede estar vacío.", 400);
+  if (notas_corazon !== undefined && (!notas_corazon || typeof notas_corazon !== "string" || !String(notas_corazon).trim()))
+    return apiError("CAMPO_INVALIDO", "El campo 'notas_corazon' no puede estar vacío.", 400);
+  if (notas_fondo !== undefined && (!notas_fondo || typeof notas_fondo !== "string" || !String(notas_fondo).trim()))
+    return apiError("CAMPO_INVALIDO", "El campo 'notas_fondo' no puede estar vacío.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
 
   try {
+    const data: Prisma.ProductoUpdateInput = {};
+    if (nombre !== undefined) data.nombre = String(nombre).trim();
+    if (marca !== undefined) data.marca = String(marca).trim();
+    if (stock !== undefined) data.stock = Number(stock);
+    if (ingrediente !== undefined) data.ingrediente = String(ingrediente).trim();
+    if (imagen_url !== undefined) data.imagen_url = imagen_url ? String(imagen_url) : null;
+    if (notas_salida !== undefined) data.notas_salida = notas_salida ? String(notas_salida) : null;
+    if (notas_corazon !== undefined) data.notas_corazon = notas_corazon ? String(notas_corazon) : null;
+    if (notas_fondo !== undefined) data.notas_fondo = notas_fondo ? String(notas_fondo) : null;
+
     const actualizado = await prisma.producto.update({
       where: { id_producto },
-      data: {
-        ...(nombre !== undefined && { nombre: String(nombre).trim() }),
-        ...(marca !== undefined && { marca: String(marca).trim() }),
-        ...(stock !== undefined && { stock: Number(stock) }),
-        ...(ingrediente !== undefined && { ingrediente: ingrediente ? String(ingrediente) : null }),
-        ...(imagen_url !== undefined && { imagen_url: imagen_url ? String(imagen_url) : null }),
-        ...(notas_salida !== undefined && { notas_salida: notas_salida ? String(notas_salida) : null }),
-        ...(notas_corazon !== undefined && { notas_corazon: notas_corazon ? String(notas_corazon) : null }),
-        ...(notas_fondo !== undefined && { notas_fondo: notas_fondo ? String(notas_fondo) : null }),
-      },
+      data,
       select: {
         id_producto: true,
         nombre: true,

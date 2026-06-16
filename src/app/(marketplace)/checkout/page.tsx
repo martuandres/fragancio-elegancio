@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Droplets } from "lucide-react";
+import { ArrowLeft, Droplets, MapPin, Pencil, Check, X } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -19,19 +19,51 @@ type Item = {
 };
 
 type CarritoData = { id_carrito: number | null; items: Item[]; total: number };
+type Perfil = { nombre: string; email: string; direccion_envio: string; telefono: string };
 
 export default function CheckoutPage() {
   const [carrito, setCarrito] = useState<CarritoData | null>(null);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [editandoDireccion, setEditandoDireccion] = useState(false);
+  const [nuevaDireccion, setNuevaDireccion] = useState("");
+  const [guardandoDireccion, setGuardandoDireccion] = useState(false);
+
   useEffect(() => {
-    fetch("/api/carrito")
-      .then((r) => r.json())
-      .then(setCarrito)
-      .finally(() => setLoading(false));
+    Promise.all([
+      fetch("/api/carrito").then((r) => r.json()),
+      fetch("/api/auth/perfil").then((r) => r.ok ? r.json() : null),
+    ]).then(([carritoData, perfilData]) => {
+      setCarrito(carritoData);
+      setPerfil(perfilData);
+    }).finally(() => setLoading(false));
   }, []);
+
+  async function handleGuardarDireccion() {
+    if (!nuevaDireccion.trim()) return;
+    setGuardandoDireccion(true);
+    try {
+      const res = await fetch("/api/auth/perfil", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direccion_envio: nuevaDireccion.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPerfil(data);
+        setEditandoDireccion(false);
+      } else {
+        setError("No se pudo actualizar la dirección. Intentá de nuevo.");
+      }
+    } catch {
+      setError("Error de conexión al actualizar la dirección.");
+    } finally {
+      setGuardandoDireccion(false);
+    }
+  }
 
   async function handleConfirmar() {
     setConfirming(true);
@@ -40,14 +72,12 @@ export default function CheckoutPage() {
       const res = await fetch("/api/checkout", { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message ?? "Error al confirmar el pedido");
+        setError(data.error?.message ?? data.message ?? "Error al confirmar el pedido");
         return;
       }
-      // Si el servidor devolvió un init_point de MercadoPago, redirigir allí
       if (data.init_point) {
         window.location.href = data.init_point;
       } else {
-        // Fallback: sin MP configurado, ir directo al pedido
         window.location.href = `/pedidos/${data.id_carrito}`;
       }
     } catch {
@@ -90,6 +120,63 @@ export default function CheckoutPage() {
           </div>
         ) : (
           <>
+            {/* Dirección de envío */}
+            <Card className="bg-white">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="size-4 text-stone-500" />
+                  Dirección de envío
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {editandoDireccion ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={nuevaDireccion}
+                      onChange={(e) => setNuevaDireccion(e.target.value)}
+                      placeholder="Av. Corrientes 1234, CABA"
+                      className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm outline-none focus:border-stone-900 transition-colors"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={handleGuardarDireccion}
+                      disabled={guardandoDireccion}
+                      className="shrink-0"
+                    >
+                      <Check className="size-4 text-green-600" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setEditandoDireccion(false)}
+                      disabled={guardandoDireccion}
+                      className="shrink-0"
+                    >
+                      <X className="size-4 text-stone-400" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-stone-700">{perfil?.direccion_envio ?? "—"}</p>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setNuevaDireccion(perfil?.direccion_envio ?? "");
+                        setEditandoDireccion(true);
+                      }}
+                      className="shrink-0"
+                    >
+                      <Pencil className="size-3.5 text-stone-400" />
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Resumen del pedido */}
             <Card className="bg-white">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base">Resumen del pedido</CardTitle>

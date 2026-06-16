@@ -23,10 +23,12 @@ export async function POST() {
 
   const comprador = await prisma.comprador.findFirst({
     where: { email },
-    select: { legajo: true },
+    select: { legajo: true, direccion_envio: true },
   });
   if (!comprador)
     return apiError("USUARIO_NO_ENCONTRADO", "El comprador no existe en el sistema.", 404);
+  if (!comprador.direccion_envio.trim())
+    return apiError("DIRECCION_REQUERIDA", "Debés configurar una dirección de envío antes de comprar.", 400);
 
   const carrito = await prisma.carrito.findFirst({
     where: { legajo: comprador.legajo, estado: "activo" },

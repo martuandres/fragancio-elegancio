@@ -2,7 +2,6 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
 import { NextRequest } from "next/server";
-import { Prisma } from "@/generated/prisma/client";
 
 async function resolveVendedor() {
   const { userId } = await auth();
@@ -94,6 +93,14 @@ export async function POST(req: NextRequest) {
     return apiError("CAMPO_REQUERIDO", "El campo 'nombre' es obligatorio.", 400);
   if (!marca || typeof marca !== "string" || !marca.trim())
     return apiError("CAMPO_REQUERIDO", "El campo 'marca' es obligatorio.", 400);
+  if (!ingrediente || typeof ingrediente !== "string" || !String(ingrediente).trim())
+    return apiError("CAMPO_REQUERIDO", "El campo 'ingrediente' es obligatorio.", 400);
+  if (!notas_salida || typeof notas_salida !== "string" || !String(notas_salida).trim())
+    return apiError("CAMPO_REQUERIDO", "El campo 'notas_salida' es obligatorio.", 400);
+  if (!notas_corazon || typeof notas_corazon !== "string" || !String(notas_corazon).trim())
+    return apiError("CAMPO_REQUERIDO", "El campo 'notas_corazon' es obligatorio.", 400);
+  if (!notas_fondo || typeof notas_fondo !== "string" || !String(notas_fondo).trim())
+    return apiError("CAMPO_REQUERIDO", "El campo 'notas_fondo' es obligatorio.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
 
@@ -103,7 +110,7 @@ export async function POST(req: NextRequest) {
         nombre: String(nombre).trim(),
         marca: String(marca).trim(),
         stock: stock !== undefined ? Number(stock) : 0,
-        ingrediente: ingrediente ? String(ingrediente) : null,
+        ingrediente: String(ingrediente).trim(),
         imagen_url: imagen_url ? String(imagen_url) : null,
         notas_salida: notas_salida ? String(notas_salida) : null,
         notas_corazon: notas_corazon ? String(notas_corazon) : null,

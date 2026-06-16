@@ -9,7 +9,11 @@ export async function POST(req: NextRequest) {
   if (!userId)
     return apiError("NO_AUTENTICADO", "Se requiere autenticación para completar el onboarding.", 401);
 
-  const { role } = (await req.json()) as { role: string };
+  const { role, direccion_envio, telefono } = (await req.json()) as {
+    role: string;
+    direccion_envio?: string;
+    telefono?: string;
+  };
   if (!["comprador", "vendedor", "admin"].includes(role))
     return apiError("ROL_INVALIDO", "El rol debe ser 'comprador', 'vendedor' o 'admin'.", 400);
 
@@ -23,10 +27,24 @@ export async function POST(req: NextRequest) {
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || email;
 
   if (role === "comprador" || role === "admin") {
+    if (!direccion_envio?.trim())
+      return apiError("CAMPO_REQUERIDO", "La dirección de envío es obligatoria.", 400);
+    if (!telefono?.trim())
+      return apiError("CAMPO_REQUERIDO", "El teléfono es obligatorio.", 400);
+
     await prisma.comprador.upsert({
       where: { email },
-      create: { legajo: `C-${Date.now()}`, email, nombre },
-      update: {},
+      create: {
+        legajo: `C-${Date.now()}`,
+        email,
+        nombre,
+        direccion_envio: direccion_envio.trim(),
+        telefono: telefono.trim(),
+      },
+      update: {
+        direccion_envio: direccion_envio.trim(),
+        telefono: telefono.trim(),
+      },
     });
   }
   if (role === "vendedor" || role === "admin") {

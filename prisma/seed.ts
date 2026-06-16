@@ -36,7 +36,7 @@ async function main() {
       nombre,
       marca,
       stock:         10,
-      ingrediente:   p.description?.trim() || null,
+      ingrediente:   p.description?.trim() || "",
       imagen_url:    p.image_url?.trim() || null,
       notas_salida:  p.notes_top?.join(", ")    || null,
       notas_corazon: p.notes_middle?.join(", ") || null,

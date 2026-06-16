@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Droplets, Package, Truck, ClipboardList } from "lucide-react";
+import { ArrowLeft, Package, Truck, ClipboardList } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -20,7 +20,7 @@ type EnvioItem = {
     comprador: {
       nombre: string;
       email: string;
-      direccion_envio: string | null;
+      direccion_envio: string;
     };
     items: {
       cantidad: number;
@@ -121,11 +121,9 @@ export default function VentasPage() {
                       </p>
                       <p className="font-semibold text-stone-800">{e.carrito.comprador.nombre}</p>
                       <p className="text-sm text-stone-500">{e.carrito.comprador.email}</p>
-                      {e.carrito.comprador.direccion_envio && (
-                        <p className="text-xs text-stone-400 mt-0.5">
-                          {e.carrito.comprador.direccion_envio}
-                        </p>
-                      )}
+                      <p className="text-xs text-stone-400 mt-0.5">
+                        {e.carrito.comprador.direccion_envio}
+                      </p>
                     </div>
                     <Button
                       size="sm"

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { apiError } from "@/lib/api-error";
 import { enviarEmail } from "@/lib/notificaciones";
+import { Prisma } from "@/generated/prisma/client";
 import crypto from "crypto";
 
 const ESTADOS_PAGO = ["aprobado", "rechazado"] as const;
@@ -17,8 +18,11 @@ function verificarFirma(body: string, signature: string, secret: string): boolea
   }
 }
 
+const ZERO = new Prisma.Decimal(0);
+
 // POST /api/pagos/webhook — confirmación de pago desde proveedor externo (Stripe / MercadoPago)
-// Aprobado: actualiza Pago, crea Factura y crea Envio. Rechazado: repone stock y cancela el pedido.
+// Aprobado: actualiza Pago, crea Factura, crea Envio y acredita saldo a vendedores.
+// Rechazado: repone stock y cancela el pedido.
 export async function POST(req: Request) {
   const secret = process.env.WEBHOOK_SECRET;
   if (!secret)
@@ -59,7 +63,7 @@ export async function POST(req: Request) {
     return apiError("PAGO_YA_PROCESADO", "Este pago ya fue procesado anteriormente.", 409);
 
   if (estado === "aprobado") {
-    // Transacción: si falla la creación de Factura o Envio, el Pago queda
+    // Transacción: si falla cualquier paso (Factura, Envio, saldo), el Pago queda
     // "pendiente" y el reintento del proveedor puede procesarse completo.
     const factura = await prisma.$transaction(async (tx) => {
       await tx.pago.update({
@@ -78,15 +82,19 @@ export async function POST(req: Request) {
                 orderBy: { ranking: "asc" as const },
                 select: { precio: true },
               },
+              vendedores: {
+                select: { id_vendedor: true },
+              },
             },
           },
         },
       });
 
+      // Aritmética Decimal para evitar errores de punto flotante en importes monetarios
       const importe_total = items.reduce((sum, item) => {
-        const precio = Number(item.producto.variante[0]?.precio ?? 0);
-        return sum + precio * item.cantidad;
-      }, 0);
+        const precio = item.producto.variante[0]?.precio ?? ZERO;
+        return sum.add(precio.mul(item.cantidad));
+      }, ZERO);
 
       const creada = await tx.factura.create({
         data: { id_pago: pago.id_pago, importe_total },
@@ -98,6 +106,25 @@ export async function POST(req: Request) {
         create: { id_carrito, estado: "preparando" },
         update: {},
       });
+
+      // Acreditar saldo a cada vendedor involucrado en el carrito.
+      // Si un producto no tiene vendedor registrado (dato corrupto), se omite sin fallar.
+      const saldoPorVendedor = new Map<number, Prisma.Decimal>();
+      for (const item of items) {
+        const id_vendedor = item.producto.vendedores[0]?.id_vendedor;
+        if (id_vendedor === undefined) continue;
+        const precio = item.producto.variante[0]?.precio ?? ZERO;
+        const subtotal = precio.mul(item.cantidad);
+        const acumulado = saldoPorVendedor.get(id_vendedor) ?? ZERO;
+        saldoPorVendedor.set(id_vendedor, acumulado.add(subtotal));
+      }
+
+      for (const [id_vendedor, incremento] of saldoPorVendedor) {
+        await tx.vendedor.update({
+          where: { id_vendedor },
+          data: { saldo: { increment: incremento } },
+        });
+      }
 
       return creada;
     });
