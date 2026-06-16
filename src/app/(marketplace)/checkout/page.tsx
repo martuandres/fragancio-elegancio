@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, Clock, Droplets } from "lucide-react";
+import { ArrowLeft, Droplets } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -20,18 +20,10 @@ type Item = {
 
 type CarritoData = { id_carrito: number | null; items: Item[]; total: number };
 
-type PagoResult = {
-  id_pago: string;
-  id_carrito: number;
-  importe_total: number;
-  estado: string;
-};
-
 export default function CheckoutPage() {
   const [carrito, setCarrito] = useState<CarritoData | null>(null);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
-  const [pago, setPago] = useState<PagoResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,10 +39,16 @@ export default function CheckoutPage() {
     try {
       const res = await fetch("/api/checkout", { method: "POST" });
       const data = await res.json();
-      if (res.ok) {
-        setPago(data);
-      } else {
+      if (!res.ok) {
         setError(data.message ?? "Error al confirmar el pedido");
+        return;
+      }
+      // Si el servidor devolvió un init_point de MercadoPago, redirigir allí
+      if (data.init_point) {
+        window.location.href = data.init_point;
+      } else {
+        // Fallback: sin MP configurado, ir directo al pedido
+        window.location.href = `/pedidos/${data.id_carrito}`;
       }
     } catch {
       setError("Error de conexión");
@@ -63,46 +61,6 @@ export default function CheckoutPage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="size-8 animate-spin rounded-full border-4 border-stone-200 border-t-stone-800" />
-      </div>
-    );
-  }
-
-  if (pago) {
-    return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full text-center space-y-5">
-          <CheckCircle className="size-16 text-green-500 mx-auto" />
-          <h1 className="text-2xl font-bold text-stone-800">¡Pedido registrado!</h1>
-          <p className="text-stone-500 text-sm">
-            Tu pedido fue creado y está pendiente de confirmación de pago.
-          </p>
-          <Card className="bg-white text-left">
-            <CardContent className="p-4 space-y-2.5">
-              <div className="flex justify-between text-sm">
-                <span className="text-stone-500">N° de pedido</span>
-                <span className="font-mono font-medium">#{pago.id_carrito}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-stone-500">Total</span>
-                <span className="font-bold">
-                  ${pago.importe_total.toLocaleString("es-AR")}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-stone-500">Estado</span>
-                <span className="flex items-center gap-1 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
-                  <Clock className="size-3" /> Pendiente de pago
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-          <Link
-            href={`/pedidos/${pago.id_carrito}`}
-            className={cn(buttonVariants(), "w-full justify-center")}
-          >
-            Ver mi pedido
-          </Link>
-        </div>
       </div>
     );
   }
@@ -155,6 +113,10 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
+            <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700">
+              Serás redirigido a MercadoPago para completar el pago de forma segura.
+            </div>
+
             {error && (
               <p className="rounded-md bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
                 {error}
@@ -162,7 +124,7 @@ export default function CheckoutPage() {
             )}
 
             <Button className="w-full" disabled={confirming} onClick={handleConfirmar}>
-              {confirming ? "Procesando…" : "Confirmar pedido"}
+              {confirming ? "Redirigiendo a MercadoPago…" : "Pagar con MercadoPago"}
             </Button>
           </>
         )}
