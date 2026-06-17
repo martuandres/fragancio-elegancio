@@ -69,23 +69,29 @@ export async function POST() {
     return apiError("CHECKOUT_FALLIDO", message, 409);
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
   // CU-03 paso 3: crear preferencia en MP y redirigir al Sistema de Pagos externo.
   // Si MP falla aquí, se revierte el checkout para dejar el sistema en estado consistente
   // y el usuario puede volver a intentarlo (carrito queda activo).
   let initPoint: string | null = null;
   if (process.env.MP_ACCESS_TOKEN) {
+    const mpItems = carrito.items.map((item) => ({
+      id: item.id_producto.toString(),
+      title: item.producto.nombre,
+      quantity: item.cantidad,
+      unit_price: parseFloat(item.producto.variante[0]?.precio?.toString() ?? "0"),
+      currency_id: "ARS",
+    }));
+
+    if (mpItems.some((i) => !Number.isFinite(i.unit_price) || i.unit_price <= 0)) {
+      return apiError("PRECIO_INVALIDO", "Uno o más productos no tienen precio configurado. Contactá al vendedor.", 400);
+    }
+
     try {
       const pref = await mpPreference.create({
         body: {
-          items: carrito.items.map((item) => ({
-            id: item.id_producto.toString(),
-            title: item.producto.nombre,
-            quantity: item.cantidad,
-            unit_price: Number(item.producto.variante[0]?.precio ?? 0),
-            currency_id: "ARS",
-          })),
+          items: mpItems,
           external_reference: carrito.id_carrito.toString(),
           back_urls: {
             success: `${baseUrl}/pago/exito`,

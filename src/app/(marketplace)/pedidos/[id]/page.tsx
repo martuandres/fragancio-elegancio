@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Droplets, Package, Truck, CheckCircle, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, Droplets, Package, Truck, CheckCircle, XCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -94,19 +95,59 @@ export default function PedidoDetailPage() {
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const pagoEstadoRef = useRef<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/pedidos/${id}`)
-      .then(async (r) => {
-        if (!r.ok) {
-          const d = await r.json();
-          setError(d.message ?? "Error al cargar el pedido");
-          return;
-        }
-        setPedido(await r.json());
-      })
-      .finally(() => setLoading(false));
+    async function cargar() {
+      const r = await fetch(`/api/pedidos/${id}`);
+      if (!r.ok) {
+        const d = await r.json();
+        setError(d.message ?? "Error al cargar el pedido");
+        setLoading(false);
+        return;
+      }
+      const data: Pedido = await r.json();
+
+      // Detectar cambio de estado del pago para notificar al comprador
+      const estadoAnterior = pagoEstadoRef.current;
+      const estadoNuevo = data.pago?.estado ?? null;
+      if (estadoAnterior === "pendiente" && estadoNuevo === "aprobado") {
+        toast.success("¡Pago aprobado! Tu pedido está en camino.");
+      } else if (estadoAnterior === "pendiente" && estadoNuevo === "rechazado") {
+        toast.error("El pago fue rechazado. El stock fue repuesto.");
+      }
+      pagoEstadoRef.current = estadoNuevo;
+
+      setPedido(data);
+      setLoading(false);
+    }
+
+    cargar();
   }, [id]);
+
+  // Polling mientras el pago esté pendiente
+  useEffect(() => {
+    if (!pedido || pedido.pago?.estado !== "pendiente") return;
+
+    const interval = setInterval(async () => {
+      const r = await fetch(`/api/pedidos/${id}`);
+      if (!r.ok) return;
+      const data: Pedido = await r.json();
+
+      const estadoNuevo = data.pago?.estado ?? null;
+      if (pagoEstadoRef.current === "pendiente" && estadoNuevo === "aprobado") {
+        toast.success("¡Pago aprobado! Tu pedido está en camino.");
+        clearInterval(interval);
+      } else if (pagoEstadoRef.current === "pendiente" && estadoNuevo === "rechazado") {
+        toast.error("El pago fue rechazado. El stock fue repuesto.");
+        clearInterval(interval);
+      }
+      pagoEstadoRef.current = estadoNuevo;
+      setPedido(data);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [id, pedido?.pago?.estado]);
 
   if (loading) {
     return (

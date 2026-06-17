@@ -200,9 +200,15 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700">
-              Serás redirigido a MercadoPago para completar el pago de forma segura.
-            </div>
+            {process.env.NEXT_PUBLIC_MP_ENABLED === "true" ? (
+              <div className="rounded-md bg-blue-50 border border-blue-200 px-4 py-2.5 text-sm text-blue-700">
+                Serás redirigido a MercadoPago para completar el pago de forma segura.
+              </div>
+            ) : (
+              <div className="rounded-md bg-stone-50 border border-stone-200 px-4 py-2.5 text-sm text-stone-600">
+                Al confirmar, tu pedido quedará registrado y podrás hacer seguimiento desde "Mis pedidos".
+              </div>
+            )}
 
             {error && (
               <p className="rounded-md bg-red-50 border border-red-200 px-4 py-2.5 text-sm text-red-700">
@@ -211,7 +217,9 @@ export default function CheckoutPage() {
             )}
 
             <Button className="w-full" disabled={confirming} onClick={handleConfirmar}>
-              {confirming ? "Redirigiendo a MercadoPago…" : "Pagar con MercadoPago"}
+              {confirming
+                ? process.env.NEXT_PUBLIC_MP_ENABLED === "true" ? "Redirigiendo a MercadoPago…" : "Confirmando pedido…"
+                : process.env.NEXT_PUBLIC_MP_ENABLED === "true" ? "Pagar con MercadoPago" : "Confirmar pedido"}
             </Button>
           </>
         )}

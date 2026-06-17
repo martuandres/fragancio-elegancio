@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Sparkles,
   Store,
+  Settings,
 } from "lucide-react";
 import Link from "next/link";
 import { VenderBoton } from "./_components/VenderBoton";
@@ -131,6 +132,23 @@ export default async function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <VenderBoton isVendedor={role === "vendedor" || role === "admin"} />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="size-10 rounded-lg bg-stone-900 flex items-center justify-center mb-2">
+                  <Settings className="size-5 text-white" />
+                </div>
+                <CardTitle className="text-base">Panel de Administración</CardTitle>
+                <CardDescription>
+                  Gestioná pedidos y simulá el flujo de pago y envío.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/admin" className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>
+                  Ir al panel <ArrowRight className="ml-1 size-4" />
+                </Link>
               </CardContent>
             </Card>
           </div>

@@ -14,6 +14,7 @@ export function AddToCartButton({
   disabled?: boolean;
 }) {
   const [status, setStatus] = useState<Status>("idle");
+  const [errorMsg, setErrorMsg] = useState("Error, reintentá");
 
   async function handleClick() {
     setStatus("loading");
@@ -23,17 +24,24 @@ export function AddToCartButton({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id_producto, cantidad: 1 }),
       });
-      setStatus(res.ok ? "done" : "error");
+      if (res.ok) {
+        setStatus("done");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error?.message ?? "No se pudo agregar al carrito");
+        setStatus("error");
+      }
     } catch {
+      setErrorMsg("Error de conexión");
       setStatus("error");
     }
-    setTimeout(() => setStatus("idle"), 2000);
+    setTimeout(() => setStatus("idle"), 2500);
   }
 
   const label =
     status === "loading" ? "Agregando..." :
     status === "done"    ? "¡Agregado!" :
-    status === "error"   ? "Error, reintentá" :
+    status === "error"   ? errorMsg :
     "Agregar al carrito";
 
   return (
