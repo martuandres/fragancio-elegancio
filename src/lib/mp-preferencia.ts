@@ -24,6 +24,8 @@ export async function crearPreferenciaMP(
         failure: `${baseUrl}/pago/rechazo`,
         pending: `${baseUrl}/pago/pendiente`,
       },
+      // auto_return solo funciona con HTTPS; en localhost MP rechaza la preferencia
+      ...(baseUrl.startsWith("https://") ? { auto_return: "approved" as const } : {}),
       notification_url: `${baseUrl}/api/pagos/mercadopago`,
     },
   });
