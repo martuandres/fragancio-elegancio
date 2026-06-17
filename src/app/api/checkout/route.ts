@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { checkoutAtomico } from "@/lib/stock";
 import { apiError } from "@/lib/api-error";
 import { enviarEmail } from "@/lib/notificaciones";
-import { mpPreference } from "@/lib/mercadopago";
+import { crearPreferenciaMP } from "@/lib/mp-preferencia";
 
 // POST /api/checkout — CU-03: valida stock → decrementa → crea Pago → redirige a MP
 export async function POST() {
@@ -74,52 +74,37 @@ export async function POST() {
   // CU-03 paso 3: crear preferencia en MP y redirigir al Sistema de Pagos externo.
   // Si MP falla aquí, se revierte el checkout para dejar el sistema en estado consistente
   // y el usuario puede volver a intentarlo (carrito queda activo).
+  const mpItems = carrito.items.map((item) => ({
+    id: item.id_producto.toString(),
+    title: item.producto.nombre,
+    quantity: item.cantidad,
+    unit_price: parseFloat(item.producto.variante[0]?.precio?.toString() ?? "0"),
+    currency_id: "ARS",
+  }));
+
+  if (mpItems.some((i) => !Number.isFinite(i.unit_price) || i.unit_price <= 0)) {
+    return apiError("PRECIO_INVALIDO", "Uno o más productos no tienen precio configurado. Contactá al vendedor.", 400);
+  }
+
   let initPoint: string | null = null;
-  if (process.env.MP_ACCESS_TOKEN) {
-    const mpItems = carrito.items.map((item) => ({
-      id: item.id_producto.toString(),
-      title: item.producto.nombre,
-      quantity: item.cantidad,
-      unit_price: parseFloat(item.producto.variante[0]?.precio?.toString() ?? "0"),
-      currency_id: "ARS",
-    }));
-
-    if (mpItems.some((i) => !Number.isFinite(i.unit_price) || i.unit_price <= 0)) {
-      return apiError("PRECIO_INVALIDO", "Uno o más productos no tienen precio configurado. Contactá al vendedor.", 400);
-    }
-
-    try {
-      const pref = await mpPreference.create({
-        body: {
-          items: mpItems,
-          external_reference: carrito.id_carrito.toString(),
-          back_urls: {
-            success: `${baseUrl}/pago/exito`,
-            failure: `${baseUrl}/pago/rechazo`,
-            pending: `${baseUrl}/pago/pendiente`,
-          },
-          notification_url: `${baseUrl}/api/pagos/mercadopago`,
-        },
-      });
-      initPoint = pref.sandbox_init_point ?? pref.init_point ?? null;
-    } catch (err) {
-      console.error("[MP] Error creando preferencia:", err);
-      // Revertir el checkout: restaurar stock, eliminar Pago, carrito vuelve a activo
-      await prisma.$transaction(async (tx) => {
-        await tx.pago.delete({ where: { id_pago: result.pago.id_pago } });
-        for (const item of checkoutItems) {
-          await tx.producto.update({
-            where: { id_producto: item.id_producto },
-            data: { stock: { increment: item.cantidad } },
-          });
-        }
-        await tx.carrito.update({
-          where: { id_carrito: carrito.id_carrito },
-          data: { estado: "activo" },
+  try {
+    initPoint = await crearPreferenciaMP(mpItems, carrito.id_carrito, baseUrl);
+  } catch (err) {
+    console.error("[MP] Error creando preferencia:", err);
+    await prisma.$transaction(async (tx) => {
+      await tx.pago.delete({ where: { id_pago: result.pago.id_pago } });
+      for (const item of checkoutItems) {
+        await tx.producto.update({
+          where: { id_producto: item.id_producto },
+          data: { stock: { increment: item.cantidad } },
         });
-      }).catch((rollbackErr) => console.error("[MP] Error en rollback:", rollbackErr));
-      return apiError("MP_ERROR", "No se pudo iniciar el proceso de pago con MercadoPago. Intentá de nuevo.", 502);
-    }
+      }
+      await tx.carrito.update({
+        where: { id_carrito: carrito.id_carrito },
+        data: { estado: "activo" },
+      });
+    }).catch((rollbackErr) => console.error("[MP] Error en rollback:", rollbackErr));
+    return apiError("MP_ERROR", "No se pudo iniciar el proceso de pago con MercadoPago. Intentá de nuevo.", 502);
   }
 
   // Emails de restock fire-and-forget, solo si el checkout y MP fueron exitosos

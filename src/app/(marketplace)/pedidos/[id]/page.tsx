@@ -5,8 +5,8 @@ import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Droplets, Package, Truck, CheckCircle, XCircle } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
+import { ArrowLeft, Droplets, Package, Truck, CheckCircle, XCircle, CreditCard, Loader2 } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -95,6 +95,7 @@ export default function PedidoDetailPage() {
   const [pedido, setPedido] = useState<Pedido | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pagando, setPagando] = useState(false);
   const pagoEstadoRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -149,6 +150,23 @@ export default function PedidoDetailPage() {
     return () => clearInterval(interval);
   }, [id, pedido?.pago?.estado]);
 
+  async function handleCompletarPago() {
+    setPagando(true);
+    try {
+      const res = await fetch(`/api/pedidos/${id}/pagar`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error?.message ?? data.message ?? "No se pudo iniciar el pago");
+        return;
+      }
+      window.location.href = data.init_point;
+    } catch {
+      toast.error("Error de conexión");
+    } finally {
+      setPagando(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -185,16 +203,24 @@ export default function PedidoDetailPage() {
           <Droplets className="size-5 text-stone-600" />
           <span className="font-semibold tracking-tight">Pedido #{pedido.id_carrito}</span>
         </div>
-        {pedido.pago && (
-          <span
-            className={cn(
-              "text-xs px-2 py-0.5 rounded-full ml-auto",
-              PAGO_COLORS[pedido.pago.estado] ?? "bg-stone-100 text-stone-700"
-            )}
-          >
-            {PAGO_LABEL[pedido.pago.estado] ?? pedido.pago.estado}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {pedido.pago && (
+            <span
+              className={cn(
+                "text-xs px-2 py-0.5 rounded-full",
+                PAGO_COLORS[pedido.pago.estado] ?? "bg-stone-100 text-stone-700"
+              )}
+            >
+              {PAGO_LABEL[pedido.pago.estado] ?? pedido.pago.estado}
+            </span>
+          )}
+          {pedido.pago?.estado === "pendiente" && (
+            <Button size="sm" onClick={handleCompletarPago} disabled={pagando} className="gap-1.5">
+              {pagando ? <Loader2 className="size-3.5 animate-spin" /> : <CreditCard className="size-3.5" />}
+              {pagando ? "Redirigiendo…" : "Completar pago"}
+            </Button>
+          )}
+        </div>
       </header>
 
       <main className="mx-auto max-w-2xl px-4 py-8 space-y-5">

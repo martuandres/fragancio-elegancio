@@ -2,14 +2,70 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { Clock, Loader2, CheckCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+
+type Estado = "cargando" | "aprobado" | "pendiente" | "error";
 
 function PendienteContent() {
   const params = useSearchParams();
   const idCarrito = params.get("external_reference");
+  const paymentId = params.get("collection_id") ?? params.get("payment_id");
+
+  const [estado, setEstado] = useState<Estado>(paymentId ? "cargando" : "pendiente");
+
+  useEffect(() => {
+    if (!paymentId) return;
+
+    fetch("/api/pagos/confirmar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ payment_id: paymentId }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && data.estado === "aprobado") setEstado("aprobado");
+        else if (!data.ok && data.motivo === "pago_ya_procesado") setEstado("aprobado");
+        else setEstado("pendiente");
+      })
+      .catch(() => setEstado("error"));
+  }, [paymentId]);
+
+  if (estado === "cargando") {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="size-10 animate-spin text-stone-400 mx-auto" />
+          <p className="text-sm text-stone-500">Verificando tu pago…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (estado === "aprobado") {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center space-y-5">
+          <CheckCircle className="size-16 text-green-500 mx-auto" />
+          <h1 className="text-2xl font-bold text-stone-800">¡Pago aprobado!</h1>
+          <p className="text-stone-500 text-sm">
+            Tu pago fue confirmado. En breve recibirás la confirmación por email.
+          </p>
+          {idCarrito ? (
+            <Link href={`/pedidos/${idCarrito}`} className={buttonVariants()}>
+              Ver mi pedido
+            </Link>
+          ) : (
+            <Link href="/pedidos" className={buttonVariants()}>
+              Ver mis pedidos
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
