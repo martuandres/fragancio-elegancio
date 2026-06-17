@@ -76,6 +76,7 @@ export async function GET(
     ...producto,
     variante: undefined,
     precio: Number(v?.precio ?? 0),
+    volumen: Number(v?.volumen ?? 0),
     concentracion: v?.concentracion ?? null,
     variantes: producto.variante.map((pv) => ({
       ...pv,
@@ -108,7 +109,7 @@ export async function PUT(
   }
 
   const body = (await req.json()) as Record<string, unknown>;
-  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
+  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo, precio, concentracion } = body;
 
   if (nombre !== undefined && (typeof nombre !== "string" || !String(nombre).trim()))
     return apiError("CAMPO_INVALIDO", "El campo 'nombre' no puede estar vacío.", 400);
@@ -124,32 +125,57 @@ export async function PUT(
     return apiError("CAMPO_INVALIDO", "El campo 'notas_fondo' no puede estar vacío.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
+  if (precio !== undefined && (isNaN(Number(precio)) || Number(precio) <= 0))
+    return apiError("CAMPO_INVALIDO", "El campo 'precio' debe ser un número mayor a 0.", 400);
+  if (concentracion !== undefined && (!concentracion || typeof concentracion !== "string" || !String(concentracion).trim()))
+    return apiError("CAMPO_INVALIDO", "El campo 'concentracion' no puede estar vacío.", 400);
 
   try {
-    const data: Prisma.ProductoUpdateInput = {};
-    if (nombre !== undefined) data.nombre = String(nombre).trim();
-    if (marca !== undefined) data.marca = String(marca).trim();
-    if (stock !== undefined) data.stock = Number(stock);
-    if (ingrediente !== undefined) data.ingrediente = String(ingrediente).trim();
-    if (imagen_url !== undefined) data.imagen_url = imagen_url ? String(imagen_url) : null;
-    if (notas_salida !== undefined) data.notas_salida = notas_salida ? String(notas_salida) : null;
-    if (notas_corazon !== undefined) data.notas_corazon = notas_corazon ? String(notas_corazon) : null;
-    if (notas_fondo !== undefined) data.notas_fondo = notas_fondo ? String(notas_fondo) : null;
+    const productoData: Prisma.ProductoUpdateInput = {};
+    if (nombre !== undefined) productoData.nombre = String(nombre).trim();
+    if (marca !== undefined) productoData.marca = String(marca).trim();
+    if (stock !== undefined) productoData.stock = Number(stock);
+    if (ingrediente !== undefined) productoData.ingrediente = String(ingrediente).trim();
+    if (imagen_url !== undefined) productoData.imagen_url = imagen_url ? String(imagen_url) : null;
+    if (notas_salida !== undefined) productoData.notas_salida = notas_salida ? String(notas_salida) : null;
+    if (notas_corazon !== undefined) productoData.notas_corazon = notas_corazon ? String(notas_corazon) : null;
+    if (notas_fondo !== undefined) productoData.notas_fondo = notas_fondo ? String(notas_fondo) : null;
 
-    const actualizado = await prisma.producto.update({
-      where: { id_producto },
-      data,
-      select: {
-        id_producto: true,
-        nombre: true,
-        marca: true,
-        stock: true,
-        imagen_url: true,
-        ingrediente: true,
-        notas_salida: true,
-        notas_corazon: true,
-        notas_fondo: true,
-      },
+    const actualizado = await prisma.$transaction(async (tx) => {
+      const prod = await tx.producto.update({
+        where: { id_producto },
+        data: productoData,
+        select: {
+          id_producto: true,
+          nombre: true,
+          marca: true,
+          stock: true,
+          imagen_url: true,
+          ingrediente: true,
+          notas_salida: true,
+          notas_corazon: true,
+          notas_fondo: true,
+        },
+      });
+
+      if (precio !== undefined || concentracion !== undefined) {
+        const variante = await tx.varianteProducto.findFirst({
+          where: { id_producto },
+          orderBy: { ranking: "asc" },
+          select: { id_variante_producto: true },
+        });
+        if (variante) {
+          const varianteData: Prisma.VarianteProductoUpdateInput = {};
+          if (precio !== undefined) varianteData.precio = Number(precio);
+          if (concentracion !== undefined) varianteData.concentracion = String(concentracion).trim();
+          await tx.varianteProducto.update({
+            where: { id_variante_producto: variante.id_variante_producto },
+            data: varianteData,
+          });
+        }
+      }
+
+      return prod;
     });
 
     return Response.json(actualizado);

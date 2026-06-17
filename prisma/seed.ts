@@ -62,7 +62,7 @@ async function main() {
           id_producto:   producto.id_producto,
           volumen:       50,
           precio:        50000,
-          concentracion: p.gender?.trim() || null,
+          concentracion: p.gender?.trim() || "EDP",
           ranking:       1,
         },
       });

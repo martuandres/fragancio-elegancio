@@ -80,7 +80,7 @@ El núcleo del sistema sería su capacidad de filtrado inteligente, que va a uti
 | **Secuencia Normal** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | 1 | El Comprador ingresa al marketplace o selecciona una categoría | El sistema solicita al Servicio Catálogo los productos disponibles y los muestra |
 |  | 2 | El Comprador ingresa un término de búsqueda o aplica filtros | El sistema consulta la base de datos por nombre, categoría o notas olfativas y devuelve los resultados |
-|  | 2.1 |  | Si no se encuentran resultados, el sistema muestra un mensaje y sugiere productos similares mediante el Motor de Recomendación |
+|  | 2.1 |  | Si no se encuentran resultados, el sistema muestra un mensaje y sugiere los productos más vendidos (bestsellers) como alternativa |
 | **Excepciones** | **#** | **Acción (Actor)** | **Reacción (Sistema)** |
 |  | — |  |  |
 | **Rendimiento** | El sistema deberá realizar la búsqueda y mostrar resultados en un máximo de 500 ms mediante el uso de índices o caché |  |  |
