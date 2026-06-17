@@ -20,6 +20,9 @@ export default function NuevoProductoPage() {
     nombre: "",
     marca: "",
     stock: "",
+    precio: "",
+    volumen: "",
+    concentracion: "",
     ingrediente: "",
     imagen_url: "",
     notas_salida: "",
@@ -39,12 +42,15 @@ export default function NuevoProductoPage() {
     const payload = {
       nombre: form.nombre.trim(),
       marca: form.marca.trim(),
-      ...(form.stock !== "" && { stock: Number(form.stock) }),
-      ...(form.ingrediente.trim() && { ingrediente: form.ingrediente.trim() }),
+      precio: Number(form.precio),
+      volumen: Number(form.volumen),
+      concentracion: form.concentracion.trim(),
+      stock: form.stock !== "" ? Number(form.stock) : 0,
+      ingrediente: form.ingrediente.trim(),
       ...(form.imagen_url.trim() && { imagen_url: form.imagen_url.trim() }),
-      ...(form.notas_salida.trim() && { notas_salida: form.notas_salida.trim() }),
-      ...(form.notas_corazon.trim() && { notas_corazon: form.notas_corazon.trim() }),
-      ...(form.notas_fondo.trim() && { notas_fondo: form.notas_fondo.trim() }),
+      notas_salida: form.notas_salida.trim(),
+      notas_corazon: form.notas_corazon.trim(),
+      notas_fondo: form.notas_fondo.trim(),
     };
 
     try {
@@ -57,7 +63,7 @@ export default function NuevoProductoPage() {
       if (res.ok) {
         router.push("/vendedor");
       } else {
-        setError(data.message ?? "No se pudo crear el producto");
+        setError(data.error?.message ?? data.message ?? "No se pudo crear el producto");
       }
     } catch {
       setError("Error de conexión");
@@ -127,35 +133,79 @@ export default function NuevoProductoPage() {
 
           <Card className="bg-white">
             <CardHeader className="pb-3">
+              <CardTitle className="text-base">Variante</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Field label="Precio (ARS) *">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  className={inputClass}
+                  placeholder="Ej: 85000"
+                  value={form.precio}
+                  onChange={(e) => set("precio", e.target.value)}
+                />
+              </Field>
+              <Field label="Volumen (ml) *">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  className={inputClass}
+                  placeholder="Ej: 50"
+                  value={form.volumen}
+                  onChange={(e) => set("volumen", e.target.value)}
+                />
+              </Field>
+              <Field label="Concentración *" hint="Ej: EDP, EDT, Parfum">
+                <input
+                  required
+                  className={inputClass}
+                  placeholder="Ej: EDP"
+                  value={form.concentracion}
+                  onChange={(e) => set("concentracion", e.target.value)}
+                />
+              </Field>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Perfil olfativo</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Field label="Notas de salida" hint="Separadas por coma">
+              <Field label="Notas de salida *" hint="Separadas por coma">
                 <input
+                  required
                   className={inputClass}
                   placeholder="Ej: Bergamot, Lemon, Grapefruit"
                   value={form.notas_salida}
                   onChange={(e) => set("notas_salida", e.target.value)}
                 />
               </Field>
-              <Field label="Notas de corazón" hint="Separadas por coma">
+              <Field label="Notas de corazón *" hint="Separadas por coma">
                 <input
+                  required
                   className={inputClass}
                   placeholder="Ej: Rose, Jasmine, Violet"
                   value={form.notas_corazon}
                   onChange={(e) => set("notas_corazon", e.target.value)}
                 />
               </Field>
-              <Field label="Notas de fondo" hint="Separadas por coma">
+              <Field label="Notas de fondo *" hint="Separadas por coma">
                 <input
+                  required
                   className={inputClass}
                   placeholder="Ej: Sandalwood, Musk, Amber"
                   value={form.notas_fondo}
                   onChange={(e) => set("notas_fondo", e.target.value)}
                 />
               </Field>
-              <Field label="Ingredientes" hint="Separados por coma">
+              <Field label="Ingredientes *" hint="Separados por coma">
                 <input
+                  required
                   className={inputClass}
                   placeholder="Ej: Ambroxan, Safraleine"
                   value={form.ingrediente}

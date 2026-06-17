@@ -14,9 +14,10 @@ type Producto = {
   marca: string;
   stock: number;
   precio: number;
+  volumen: number;
   concentracion: string | null;
   imagen_url: string | null;
-  ingrediente: string | null;
+  ingrediente: string;
   notas_salida: string | null;
   notas_corazon: string | null;
   notas_fondo: string | null;
@@ -24,6 +25,9 @@ type Producto = {
 
 const inputClass =
   "w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-400";
+
+const readonlyClass =
+  "w-full rounded-md border border-stone-100 bg-stone-50 px-3 py-2 text-sm text-stone-400 cursor-not-allowed";
 
 export default function EditarProductoPage() {
   const { id } = useParams<{ id: string }>();
@@ -39,6 +43,8 @@ export default function EditarProductoPage() {
     nombre: "",
     marca: "",
     stock: "",
+    precio: "",
+    concentracion: "",
     ingrediente: "",
     imagen_url: "",
     notas_salida: "",
@@ -57,14 +63,16 @@ export default function EditarProductoPage() {
         const p: Producto = await r.json();
         setProducto(p);
         setForm({
-          nombre:       p.nombre,
-          marca:        p.marca,
-          stock:        String(p.stock),
-          ingrediente:  p.ingrediente ?? "",
-          imagen_url:   p.imagen_url ?? "",
-          notas_salida: p.notas_salida ?? "",
+          nombre:        p.nombre,
+          marca:         p.marca,
+          stock:         String(p.stock),
+          precio:        String(p.precio),
+          concentracion: p.concentracion ?? "",
+          ingrediente:   p.ingrediente,
+          imagen_url:    p.imagen_url ?? "",
+          notas_salida:  p.notas_salida ?? "",
           notas_corazon: p.notas_corazon ?? "",
-          notas_fondo:  p.notas_fondo ?? "",
+          notas_fondo:   p.notas_fondo ?? "",
         });
       })
       .finally(() => setLoading(false));
@@ -80,14 +88,16 @@ export default function EditarProductoPage() {
     setSaveError(null);
 
     const payload: Record<string, unknown> = {
-      nombre: form.nombre.trim(),
-      marca:  form.marca.trim(),
-      stock:  Number(form.stock),
-      ingrediente:   form.ingrediente.trim()   || null,
-      imagen_url:    form.imagen_url.trim()    || null,
-      notas_salida:  form.notas_salida.trim()  || null,
+      nombre:        form.nombre.trim(),
+      marca:         form.marca.trim(),
+      stock:         Number(form.stock),
+      precio:        Number(form.precio),
+      concentracion: form.concentracion.trim(),
+      ingrediente:   form.ingrediente.trim(),
+      imagen_url:    form.imagen_url.trim() || null,
+      notas_salida:  form.notas_salida.trim() || null,
       notas_corazon: form.notas_corazon.trim() || null,
-      notas_fondo:   form.notas_fondo.trim()   || null,
+      notas_fondo:   form.notas_fondo.trim() || null,
     };
 
     try {
@@ -100,7 +110,7 @@ export default function EditarProductoPage() {
       if (res.ok) {
         router.push("/vendedor");
       } else {
-        setSaveError(data.message ?? "No se pudo guardar los cambios");
+        setSaveError(data.error?.message ?? data.message ?? "No se pudo guardar los cambios");
       }
     } catch {
       setSaveError("Error de conexión");
@@ -185,6 +195,40 @@ export default function EditarProductoPage() {
                   placeholder="https://..."
                   value={form.imagen_url}
                   onChange={(e) => set("imagen_url", e.target.value)}
+                />
+              </Field>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Variante</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Field label="Precio (ARS) *">
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  className={inputClass}
+                  value={form.precio}
+                  onChange={(e) => set("precio", e.target.value)}
+                />
+              </Field>
+              <Field label="Volumen (ml)" hint="No editable — define el producto">
+                <input
+                  readOnly
+                  className={readonlyClass}
+                  value={`${producto.volumen} ml`}
+                />
+              </Field>
+              <Field label="Concentración *" hint="Ej: EDP, EDT, Parfum">
+                <input
+                  required
+                  className={inputClass}
+                  value={form.concentracion}
+                  onChange={(e) => set("concentracion", e.target.value)}
                 />
               </Field>
             </CardContent>

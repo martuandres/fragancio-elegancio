@@ -60,8 +60,8 @@ model VarianteProducto {
   id_producto          Int
   volumen              Decimal
   precio               Decimal
-  concentracion        String?
-  ranking              Int?
+  concentracion        String
+  ranking              Int
   producto             Producto @relation(fields: [id_producto], references: [id_producto])
 }
 

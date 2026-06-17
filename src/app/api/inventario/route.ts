@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
     return apiError("NO_AUTENTICADO", "Autenticación requerida. Solo vendedores pueden crear productos.", 401);
 
   const body = (await req.json()) as Record<string, unknown>;
-  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo } = body;
+  const { nombre, marca, stock, ingrediente, imagen_url, notas_salida, notas_corazon, notas_fondo, precio, volumen, concentracion } = body;
 
   if (!nombre || typeof nombre !== "string" || !nombre.trim())
     return apiError("CAMPO_REQUERIDO", "El campo 'nombre' es obligatorio.", 400);
@@ -103,6 +103,12 @@ export async function POST(req: NextRequest) {
     return apiError("CAMPO_REQUERIDO", "El campo 'notas_fondo' es obligatorio.", 400);
   if (stock !== undefined && (!Number.isInteger(Number(stock)) || Number(stock) < 0))
     return apiError("STOCK_INVALIDO", "El campo 'stock' debe ser un entero no negativo.", 400);
+  if (!precio || isNaN(Number(precio)) || Number(precio) <= 0)
+    return apiError("CAMPO_REQUERIDO", "El campo 'precio' es obligatorio y debe ser mayor a 0.", 400);
+  if (!volumen || isNaN(Number(volumen)) || Number(volumen) <= 0)
+    return apiError("CAMPO_REQUERIDO", "El campo 'volumen' es obligatorio y debe ser mayor a 0.", 400);
+  if (!concentracion || typeof concentracion !== "string" || !String(concentracion).trim())
+    return apiError("CAMPO_REQUERIDO", "El campo 'concentracion' es obligatorio.", 400);
 
   try {
     const producto = await prisma.producto.create({
@@ -116,6 +122,14 @@ export async function POST(req: NextRequest) {
         notas_corazon: notas_corazon ? String(notas_corazon) : null,
         notas_fondo: notas_fondo ? String(notas_fondo) : null,
         vendedores: { create: { id_vendedor: vendedor.id_vendedor } },
+        variante: {
+          create: {
+            volumen: Number(volumen),
+            precio: Number(precio),
+            concentracion: String(concentracion).trim(),
+            ranking: 1,
+          },
+        },
       },
       select: { id_producto: true, nombre: true, marca: true },
     });
