@@ -31,8 +31,8 @@
 - **Problema:** comprar perfume online es comprar a ciegas — no se puede oler el producto. Los marketplaces genéricos solo ofrecen filtros por precio y marca.
 - **Solución:** un marketplace que modela cada fragancia por sus **atributos intrínsecos** — notas de salida, corazón y fondo, e ingredientes — y los usa para búsqueda, filtrado y recomendación.
 - **Usuarios:** Compradores (exploran, arman carrito, compran) y Vendedores (gestionan inventario y despachos).
-- **Alcance:** catálogo con filtros olfativos · carrito y checkout con stock atómico · pagos vía webhook externo · facturación y envíos · motor de recomendaciones · panel del vendedor.
-- **Fuera de alcance (decisión consciente):** integración de pasarela de pago activa, emails reales, liberación automática de reservas.
+- **Alcance:** catálogo con filtros olfativos · carrito y checkout con stock atómico · **pagos vía MercadoPago** (sandbox real) · facturación y envíos · motor de recomendaciones · panel del vendedor · panel de admin para demo.
+- **Fuera de alcance (decisión consciente):** emails reales (fire-and-forget definido, sin SMTP), liberación automática de reservas (decremento definitivo), restock automático al proveedor (solo alerta en panel).
 
 **Orador:** "El núcleo diferencial es el filtrado inteligente: tanto el usuario que sabe lo que quiere como el indeciso pueden encontrar una fragancia partiendo de las notas olfativas que le gustan. Eso definió nuestro modelo de datos y nuestro motor de recomendaciones, como van a ver."
 
@@ -53,15 +53,18 @@
 
 ---
 
-## Slide 4 — ADR 2: Integración de pagos por webhook + ADR 3: Recomendaciones con Jaccard
+## Slide 4 — ADR 2: Integración de pagos con MercadoPago + ADR 3: Recomendaciones con Jaccard
 
 **Contenido del slide:**
 
-**ADR — ¿Cómo se entera el sistema de que el pago fue aprobado?**
+**ADR — ¿Cómo integramos el pago y cómo se confirma?**
 
 - Alternativas: webhook firmado · polling al proveedor · whitelist de IPs · llamada sincrónica.
-- **Decisión:** webhook `POST /api/pagos/webhook` con firma **HMAC-SHA256** verificada con `crypto.timingSafeEqual()` + **idempotencia** (un mismo evento dos veces → 409, sin factura duplicada).
-- Trade-off: endpoint público en internet; delay entre aprobación y facturación; requiere monitorear reintentos del proveedor.
+- **Decisión:** integración con **MercadoPago SDK** (sandbox para tests). Doble path de confirmación:
+  - **Back URL** — MP redirige al usuario a `/pago/exito?external_reference={id_carrito}` → el cliente llama a `POST /api/pagos/aprobar-exito` (autenticado, confirma sin consultar MP).
+  - **IPN servidor-a-servidor** — MP llama a `POST /api/pagos/mercadopago` con firma `x-signature: ts=…,v1=<HMAC>` verificada con `crypto.timingSafeEqual()`.
+- **Idempotencia** resuelve la carrera entre los dos paths: si `Pago.estado !== "pendiente"` → early return (sin factura duplicada).
+- Trade-off: dependencia de disponibilidad de MP; `auto_return` solo funciona en HTTPS (en localhost el sandbox usa el flujo manual); los dos paths llegan casi simultáneos, la idempotencia es la única guardia.
 
 **ADR — ¿Cómo medir similitud entre perfumes?**
 
@@ -69,7 +72,7 @@
 - **Decisión:** **índice de Jaccard ponderado** sobre tags de notas: corazón 40% · salida 30% · fondo 20% · ingredientes 10%. En memoria, O(n), sin infraestructura extra.
 - Trade-off: no captura semántica ("Rose" ≠ "Rosa"); pesos estáticos definidos por criterio del equipo; no aprende del comportamiento del usuario.
 
-**Orador:** "En pagos, el polling viola eficiencia y la llamada sincrónica es incompatible con 3D Secure — el usuario tiene que interactuar con su banco. En recomendaciones, el filtrado colaborativo era inviable por cold start: en el lanzamiento no hay historial de compras. Jaccard nos da recomendaciones desde el día uno, interpretables y ajustables."
+**Orador:** "En pagos, el polling viola eficiencia y la llamada sincrónica es incompatible con 3D Secure. La clave de MercadoPago es que el pago puede confirmarse por dos caminos independientes — back_url y webhook — llegando casi simultáneos. Sin idempotencia tendríamos dos facturas para el mismo pago. En recomendaciones, el filtrado colaborativo era inviable por cold start: en el lanzamiento no hay historial. Jaccard nos da recomendaciones desde el día uno, interpretables y ajustables sin infraestructura extra."
 
 ---
 
@@ -94,37 +97,43 @@
 
 **Contenido del slide:**
 
-13 endpoints REST documentados en **OpenAPI 3.0** (`openapi.yaml`). Errores uniformes `{ error: { code, message } }`, paginación estándar `{ data, pagination }`.
+Errores uniformes `{ error: { code, message } }`, paginación estándar `{ data, pagination }`.
 
 | Ruta | Métodos | Auth |
 |---|---|---|
 | `/api/catalogo` | GET | pública |
 | `/api/carrito` | GET·POST·DELETE | comprador |
 | `/api/checkout` | POST | comprador |
-| `/api/pagos/webhook` | POST | firma HMAC |
+| `/api/pagos/webhook` | POST | firma HMAC propio |
+| `/api/pagos/mercadopago` | POST | firma MP (x-signature) |
+| `/api/pagos/aprobar-exito` | POST | comprador |
+| `/api/pagos/confirmar` | POST | autenticado |
 | `/api/recomendaciones` | GET | autenticado |
 | `/api/inventario` + `/[id]` | GET·POST·PUT·DELETE | vendedor (owner) |
 | `/api/pedidos` + `/[id]` | GET·PATCH | por rol |
+| `/api/pedidos/[id]/pagar` | POST | comprador |
 | `/api/envios/[id]` | GET·PATCH | por rol |
 | `/api/vendedor/envios` | GET | vendedor |
+| `/api/admin/pedidos` | GET | admin |
+| `/api/dev/simular-pago` | POST | autenticado (demo) |
+| `/api/dev/avanzar-envio` | POST | autenticado (demo) |
 
-**Ejemplo 1 — Checkout:**
+**Ejemplo 1 — Checkout → redirect a MercadoPago:**
 ```http
 POST /api/checkout            → 201 Created
 { "id_pago": 12, "id_carrito": 34, "importe_total": 185000,
-  "estado": "pendiente", "reservacion_minutos": 5 }
+  "estado": "pendiente", "init_point": "https://sandbox.mercadopago.com.ar/..." }
 ```
 
-**Ejemplo 2 — Webhook de pago (firmado):**
+**Ejemplo 2 — Back URL al volver de MP (idempotente):**
 ```http
-POST /api/pagos/webhook
-X-Webhook-Signature: sha256=3f1a9c...
-{ "id_carrito": 34, "estado": "aprobado" }
-→ 200 { "ok": true, "nro_factura": "clz9abc..." }
-→ si llega de nuevo: 409 PAGO_YA_PROCESADO  (idempotencia)
+POST /api/pagos/aprobar-exito
+{ "id_carrito": 34 }
+→ 200 { "ok": true, "estado": "aprobado", "nro_factura": "clz9abc..." }
+→ si ya fue procesado: 200 { "ok": true, "detalle": "pago_ya_procesado" }
 ```
 
-**Orador:** "Dos detalles del contrato: todos los errores tienen el mismo formato con código de máquina y mensaje humano, y el webhook es idempotente porque los proveedores de pago reintentan por diseño — el segundo intento devuelve 409 sin duplicar factura ni envío."
+**Orador:** "Tres detalles del contrato: errores uniformes con código de máquina, el checkout devuelve el `init_point` de MP al que el cliente redirige al usuario, y tanto la back_url como el IPN de MP son idempotentes — el segundo path en llegar devuelve early-return sin duplicar factura."
 
 ---
 
@@ -133,10 +142,10 @@ X-Webhook-Signature: sha256=3f1a9c...
 **Contenido del slide:** solo el video + un índice de los flujos. Guión completo de grabación en `script_video_demo.md`.
 
 - **Flujo 1 — Comprar con asistencia olfativa:** catálogo → filtros por categoría → "Armar tu perfume" (selección de notas) → "Ver similares" (motor Jaccard) → agregar al carrito.
-- **Flujo 2 — Checkout atómico + confirmación de pago:** carrito → checkout (stock decrementado, `Pago` pendiente) → webhook firmado simulado → el pedido muestra **Factura** y **Envío "preparando"**.
+- **Flujo 2 — Checkout atómico + MercadoPago:** carrito → checkout (stock decrementado en `$transaction`, `Pago` pendiente, devuelve `init_point`) → redirect a **MercadoPago sandbox** → pago aprobado → back_url `/pago/exito` confirma vía `POST /api/pagos/aprobar-exito` → el pedido muestra **Factura** y **Envío "preparando"**. *(Para la demo en clase: usar el **Panel de Admin** `/admin` → botón "Aprobar pago" — activa el mismo webhook HMAC interno sin salir de la app.)*
 - **Flujo 3 — Ciclo del vendedor:** panel de inventario (ABM + banner de **stock crítico**) → panel de ventas con órdenes pendientes → "Marcar como despachado" → el pedido del comprador pasa a **"En camino"**.
 
-**Orador (mientras corre el video):** ir narrando la correspondencia con la arquitectura: "esto que ven es la transacción del ADR-1… este curl es el webhook firmado del ADR-2…". **La demo debe demostrar los ADRs, no solo pantallas.**
+**Orador (mientras corre el video):** "Esto que ven es la transacción del ADR-1 — stock, pago y estado del carrito en una sola `$transaction`. Al volver de MercadoPago, el cliente llama a `/api/pagos/aprobar-exito`: ahí crea la Factura y el Envío en otra transacción. Si el IPN server-to-server llega al mismo tiempo, la idempotencia del ADR-2 lo descarta sin duplicar la factura." **La demo debe demostrar los ADRs, no solo pantallas.**
 
 ---
 
@@ -146,7 +155,7 @@ X-Webhook-Signature: sha256=3f1a9c...
 
 **Lo más difícil:**
 - Garantizar **no-sobreventa bajo concurrencia** — entender qué garantiza una transacción y qué no.
-- Diseñar el **flujo asíncrono de pagos**: idempotencia, verificación HMAC, reintentos del proveedor.
+- Diseñar el **flujo asíncrono de pagos con MercadoPago**: doble path de confirmación (back_url + IPN), idempotencia para la carrera entre ambos, firma `x-signature` propia de MP.
 - Mantener **coherencia entre documentación y código**: 90+ correcciones registradas en `log-cambios.md` alineando E-R, casos de uso, C4 y schema.
 
 **Decisiones que volveríamos a tomar:**
